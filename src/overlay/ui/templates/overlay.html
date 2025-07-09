@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TactiBird</title>
+    <link rel="stylesheet" href="../styles/main.css">
+    <link rel="stylesheet" href="../styles/overlay.css">
+    <link rel="stylesheet" href="../styles/themes/dark.css">
+</head>
+<body>
+    <div id="overlay-container" class="overlay-container">
+        <!-- Header with status -->
+        <div id="header" class="header">
+            <div class="status-indicator">
+                <span id="connection-status" class="status-dot disconnected"></span>
+                <span class="status-text">TFT AI Coach</span>
+            </div>
+            <div class="controls">
+                <button id="minimize-btn" class="control-btn" title="Minimize">_</button>
+                <button id="settings-btn" class="control-btn" title="Settings">⚙</button>
+                <button id="close-btn" class="control-btn close" title="Close">×</button>
+            </div>
+        </div>
+
+        <!-- Main content area -->
+        <div id="main-content" class="main-content">
+            <!-- Game State Display -->
+            <div id="game-state" class="game-state-panel">
+                <div class="stat-group">
+                    <div class="stat-item">
+                        <span class="stat-label">Stage</span>
+                        <span id="stage-round" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Gold</span>
+                        <span id="gold-value" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Health</span>
+                        <span id="health-value" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Level</span>
+                        <span id="level-value" class="stat-value">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suggestions Panel -->
+            <div id="suggestions-panel" class="suggestions-panel">
+                <div class="panel-header">
+                    <h3>AI Suggestions</h3>
+                    <span id="suggestion-count" class="suggestion-count">0</span>
+                </div>
+                <div id="suggestions-list" class="suggestions-list">
+                    <!-- Suggestions will be populated here -->
+                    <div class="no-suggestions">
+                        <p>Waiting for game data...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Economy Panel -->
+            <div id="economy-panel" class="economy-panel">
+                <div class="panel-header">
+                    <h4>Economy</h4>
+                </div>
+                <div class="economy-info">
+                    <div class="economy-item">
+                        <span class="label">Interest:</span>
+                        <span id="interest-value" class="value">0</span>
+                    </div>
+                    <div class="economy-item">
+                        <span class="label">Next Breakpoint:</span>
+                        <span id="next-breakpoint" class="value">10g</span>
+                    </div>
+                    <div class="economy-item">
+                        <span class="label">Economy Strength:</span>
+                        <span id="economy-strength" class="value economy-weak">Weak</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Composition Panel -->
+            <div id="composition-panel" class="composition-panel">
+                <div class="panel-header">
+                    <h4>Team Composition</h4>
+                </div>
+                <div id="active-traits" class="active-traits">
+                    <!-- Active traits will be displayed here -->
+                </div>
+                <div id="recommended-comp" class="recommended-comp">
+                    <p class="placeholder">Analyzing composition...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification System -->
+        <div id="notifications" class="notifications">
+            <!-- Notifications will appear here -->
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Settings</h3>
+                    <button id="close-settings" class="control-btn">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <h4>Display</h4>
+                        <label class="setting-item">
+                            <input type="range" id="opacity-slider" min="0.1" max="1" step="0.1" value="0.9">
+                            <span>Opacity</span>
+                        </label>
+                        <label class="setting-item">
+                            <input type="checkbox" id="always-on-top" checked>
+                            <span>Always on top</span>
+                        </label>
+                        <label class="setting-item">
+                            <select id="theme-select">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                            </select>
+                            <span>Theme</span>
+                        </label>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <h4>Coaches</h4>
+                        <label class="setting-item">
+                            <input type="checkbox" id="economy-coach" checked>
+                            <span>Economy Coach</span>
+                        </label>
+                        <label class="setting-item">
+                            <input type="checkbox" id="composition-coach" checked>
+                            <span>Composition Coach</span>
+                        </label>
+                        <label class="setting-item">
+                            <input type="checkbox" id="positioning-coach" checked>
+                            <span>Positioning Coach</span>
+                        </label>
+                        <label class="setting-item">
+                            <input type="checkbox" id="item-coach" checked>
+                            <span>Item Coach</span>
+                        </label>
+                    </div>
+
+                    <div class="setting-group">
+                        <h4>Suggestions</h4>
+                        <label class="setting-item">
+                            <input type="range" id="max-suggestions" min="1" max="10" value="5">
+                            <span>Max suggestions: <span id="max-suggestions-value">5</span></span>
+                        </label>
+                        <label class="setting-item">
+                            <input type="range" id="suggestion-priority" min="1" max="10" value="5">
+                            <span>Min priority: <span id="suggestion-priority-value">5</span></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="save-settings" class="btn btn-primary">Save</button>
+                    <button id="cancel-settings" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading indicator -->
+    <div id="loading-indicator" class="loading-indicator">
+        <div class="spinner"></div>
+        <p>Connecting to TFT AI Coach...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../scripts/websocket_client.js"></script>
+    <script src="../scripts/ui_manager.js"></script>
+    <script src="../scripts/event_handler.js"></script>
+    <script src="../scripts/main.js"></script>
+</body>
+</html>

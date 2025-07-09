@@ -1,0 +1,435 @@
+/* Dark Theme Variables */
+:root {
+    /* Background Colors */
+    --bg-primary: rgba(26, 32, 44, 0.95);
+    --bg-secondary: rgba(45, 55, 72, 0.9);
+    --bg-tertiary: rgba(74, 85, 104, 0.8);
+    --bg-hover: rgba(90, 103, 126, 0.7);
+    
+    /* Text Colors */
+    --text-primary: #f7fafc;
+    --text-secondary: #cbd5e0;
+    --text-muted: #a0aec0;
+    
+    /* Border Colors */
+    --border-color: rgba(113, 128, 150, 0.3);
+    --border-hover: rgba(113, 128, 150, 0.5);
+    
+    /* Accent Colors */
+    --accent-color: #4299e1;
+    --accent-hover: #3182ce;
+    
+    /* Status Colors */
+    --success-color: #48bb78;
+    --warning-color: #ed8936;
+    --error-color: #f56565;
+    --info-color: #4299e1;
+    
+    /* TFT Specific Colors */
+    --tft-gold: #c6aa76;
+    --tft-blue: #0596aa;
+    --tft-purple: #8b5fbf;
+    --tft-legendary: #c89b3c;
+    
+    /* Champion Tier Colors */
+    --tier-1: #9ca3af;      /* Gray */
+    --tier-2: #22c55e;      /* Green */
+    --tier-3: #3b82f6;      /* Blue */
+    --tier-4: #a855f7;      /* Purple */
+    --tier-5: #eab308;      /* Gold */
+    
+    /* Trait Colors */
+    --trait-bronze: #cd7f32;
+    --trait-silver: #c0c0c0;
+    --trait-gold: #ffd700;
+    --trait-prismatic: #ff69b4;
+    
+    /* Overlay Opacity */
+    --overlay-opacity: 0.95;
+}
+
+/* Dark Theme Specific Styles */
+body[data-theme="dark"] {
+    background: transparent;
+}
+
+/* Enhanced Glass Effect for Dark Theme */
+.overlay-container {
+    background: linear-gradient(
+        135deg,
+        rgba(26, 32, 44, 0.95) 0%,
+        rgba(45, 55, 72, 0.9) 100%
+    );
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Header Dark Theme */
+.header {
+    background: linear-gradient(
+        135deg,
+        rgba(45, 55, 72, 0.95) 0%,
+        rgba(74, 85, 104, 0.9) 100%
+    );
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Status Indicator Colors */
+.status-dot.connected {
+    background: var(--success-color);
+    box-shadow: 0 0 6px rgba(72, 187, 120, 0.5);
+}
+
+.status-dot.disconnected {
+    background: var(--error-color);
+    box-shadow: 0 0 6px rgba(245, 101, 101, 0.5);
+}
+
+.status-dot.connecting {
+    background: var(--warning-color);
+    box-shadow: 0 0 6px rgba(237, 137, 54, 0.5);
+}
+
+/* Panel Styling for Dark Theme */
+.game-state-panel,
+.economy-panel,
+.composition-panel {
+    background: linear-gradient(
+        135deg,
+        rgba(45, 55, 72, 0.9) 0%,
+        rgba(74, 85, 104, 0.8) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Suggestion Items Dark Theme */
+.suggestion-item {
+    background: linear-gradient(
+        135deg,
+        rgba(45, 55, 72, 0.9) 0%,
+        rgba(74, 85, 104, 0.8) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.suggestion-item:hover {
+    background: linear-gradient(
+        135deg,
+        rgba(74, 85, 104, 0.9) 0%,
+        rgba(90, 103, 126, 0.8) 100%
+    );
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Priority-specific backgrounds for dark theme */
+.suggestion-item.priority-high {
+    border-left: 4px solid var(--error-color);
+    background: linear-gradient(
+        135deg,
+        rgba(245, 101, 101, 0.15) 0%,
+        rgba(45, 55, 72, 0.9) 100%
+    );
+}
+
+.suggestion-item.priority-medium {
+    border-left: 4px solid var(--warning-color);
+    background: linear-gradient(
+        135deg,
+        rgba(237, 137, 54, 0.15) 0%,
+        rgba(45, 55, 72, 0.9) 100%
+    );
+}
+
+.suggestion-item.priority-low {
+    border-left: 4px solid var(--success-color);
+    background: linear-gradient(
+        135deg,
+        rgba(72, 187, 120, 0.15) 0%,
+        rgba(45, 55, 72, 0.9) 100%
+    );
+}
+
+/* Economy Strength Colors */
+.economy-excellent { 
+    color: var(--success-color);
+    text-shadow: 0 0 4px rgba(72, 187, 120, 0.3);
+}
+.economy-strong { 
+    color: #4ade80;
+    text-shadow: 0 0 4px rgba(74, 222, 128, 0.3);
+}
+.economy-decent { 
+    color: var(--warning-color);
+    text-shadow: 0 0 4px rgba(237, 137, 54, 0.3);
+}
+.economy-weak { 
+    color: #fb923c;
+    text-shadow: 0 0 4px rgba(251, 146, 60, 0.3);
+}
+.economy-critical { 
+    color: var(--error-color);
+    text-shadow: 0 0 4px rgba(245, 101, 101, 0.3);
+    animation: pulse 1.5s infinite;
+}
+
+/* Trait Badges Dark Theme */
+.trait-badge {
+    background: rgba(74, 85, 104, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.trait-badge.active {
+    background: linear-gradient(135deg, var(--accent-color), #2b77e6);
+    color: white;
+    box-shadow: 0 0 8px rgba(66, 153, 225, 0.4);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Champion Tier Colors */
+.champion-tier-1 { color: var(--tier-1); }
+.champion-tier-2 { color: var(--tier-2); }
+.champion-tier-3 { color: var(--tier-3); }
+.champion-tier-4 { color: var(--tier-4); }
+.champion-tier-5 { color: var(--tier-5); }
+
+/* Gold Value Styling */
+.stat-value.gold {
+    color: var(--tft-gold);
+    text-shadow: 0 0 4px rgba(198, 170, 118, 0.3);
+}
+
+/* Health Value with Dynamic Colors */
+.stat-value.health-high { 
+    color: var(--success-color);
+}
+.stat-value.health-medium { 
+    color: var(--warning-color);
+}
+.stat-value.health-low { 
+    color: var(--error-color);
+    animation: pulse 2s infinite;
+}
+
+/* Modal Dark Theme */
+.modal {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: linear-gradient(
+        135deg,
+        rgba(26, 32, 44, 0.95) 0%,
+        rgba(45, 55, 72, 0.9) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header,
+.modal-footer {
+    background: linear-gradient(
+        135deg,
+        rgba(45, 55, 72, 0.95) 0%,
+        rgba(74, 85, 104, 0.9) 100%
+    );
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Form Controls Dark Theme */
+.setting-item input[type="range"] {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(66, 153, 225, 0.4);
+}
+
+.setting-item input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 4px rgba(66, 153, 225, 0.4);
+}
+
+.setting-item input[type="checkbox"] {
+    accent-color: var(--accent-color);
+}
+
+.setting-item select {
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.setting-item select:focus {
+    border-color: var(--accent-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
+}
+
+/* Notifications Dark Theme */
+.notification {
+    background: linear-gradient(
+        135deg,
+        rgba(26, 32, 44, 0.95) 0%,
+        rgba(45, 55, 72, 0.9) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+}
+
+.notification.success {
+    border-left: 4px solid var(--success-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(72, 187, 120, 0.1);
+}
+
+.notification.warning {
+    border-left: 4px solid var(--warning-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(237, 137, 54, 0.1);
+}
+
+.notification.error {
+    border-left: 4px solid var(--error-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(245, 101, 101, 0.1);
+}
+
+.notification.info {
+    border-left: 4px solid var(--info-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(66, 153, 225, 0.1);
+}
+
+/* Loading Indicator Dark Theme */
+.loading-indicator {
+    background: linear-gradient(
+        135deg,
+        rgba(26, 32, 44, 0.95) 0%,
+        rgba(45, 55, 72, 0.9) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+}
+
+.spinner {
+    border-color: var(--bg-tertiary);
+    border-top-color: var(--accent-color);
+}
+
+/* Button Dark Theme Enhancements */
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent-color), #2b77e6);
+    box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--accent-hover), #2563eb);
+    box-shadow: 0 4px 12px rgba(66, 153, 225, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Scrollbar Dark Theme */
+::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(74, 85, 104, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, 
+        rgba(113, 128, 150, 0.6), 
+        rgba(113, 128, 150, 0.4)
+    );
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, 
+        rgba(113, 128, 150, 0.8), 
+        rgba(113, 128, 150, 0.6)
+    );
+}
+
+/* Glow Effects for Interactive Elements */
+.control-btn:hover,
+.suggestion-item:hover,
+.trait-badge.active {
+    transition: all 0.3s ease;
+}
+
+/* Special Effects for Critical States */
+.stat-value.health-critical {
+    color: var(--error-color);
+    animation: criticalPulse 1s infinite alternate;
+}
+
+.suggestion-item.urgent {
+    animation: urgentGlow 2s infinite alternate;
+}
+
+@keyframes criticalPulse {
+    from {
+        text-shadow: 0 0 4px rgba(245, 101, 101, 0.3);
+    }
+    to {
+        text-shadow: 0 0 12px rgba(245, 101, 101, 0.8);
+    }
+}
+
+@keyframes urgentGlow {
+    from {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    to {
+        box-shadow: 0 2px 8px rgba(245, 101, 101, 0.4), 
+                    0 0 16px rgba(245, 101, 101, 0.2);
+    }
+}
+
+/* High DPI Display Optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .overlay-container {
+        border-width: 0.5px;
+    }
+    
+    .suggestion-item {
+        border-left-width: 2px;
+    }
+}

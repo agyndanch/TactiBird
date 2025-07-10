@@ -1,5 +1,5 @@
 """
-TactiBird Overlay - WebSocket Server (Enhanced Error Handling)
+TactiBird Overlay - WebSocket Server (Complete Fixed Version)
 """
 
 import asyncio
@@ -14,9 +14,10 @@ from src.ai.coaches.base_coach import CoachingSuggestion
 logger = logging.getLogger(__name__)
 
 class WebSocketServer:
-    """WebSocket server for overlay communication"""
+    """WebSocket server for overlay communication - Complete fixed version"""
     
     def __init__(self, port: int = 8765, host: str = "localhost"):
+        """Initialize WebSocket server"""
         # Check if port is available first
         if not is_port_available(host, port):
             logger.warning(f"Port {port} is not available, trying to find alternative...")
@@ -36,8 +37,64 @@ class WebSocketServer:
     
         logger.info(f"WebSocket server initialized on {host}:{port}")
     
+    def get_client_count(self) -> int:
+        """Get number of connected clients"""
+        return len(self.clients)
+    
+    def is_running(self) -> bool:
+        """Check if server is running - Fixed for websockets 11+"""
+        try:
+            # Check if server exists and is properly initialized
+            if not self.running or self.server is None:
+                return False
+            
+            # For websockets 11+, check if server is still serving
+            # The is_closing() method was removed
+            if hasattr(self.server, 'sockets'):
+                return len(self.server.sockets) > 0
+            
+            # Fallback: just check if we have a server object and running flag
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking server status: {e}")
+            return False
+    
+    def _is_websocket_closed(self, websocket) -> bool:
+        """Check if websocket is closed - Compatible with websockets 11+"""
+        try:
+            # For websockets 11+, check state attribute
+            if hasattr(websocket, 'state'):
+                return websocket.state.name in ['CLOSED', 'CLOSING']
+            # Fallback for older versions
+            elif hasattr(websocket, 'closed'):
+                return websocket.closed
+            else:
+                # If we can't determine, assume it's open
+                return False
+        except Exception:
+            return True  # If there's an error, assume it's closed
+    
+    async def _send_to_client(self, websocket, data: Dict[str, Any]):
+        """Send message to a specific client with error handling - Fixed for websockets 11+"""
+        try:
+            if self._is_websocket_closed(websocket):
+                logger.warning("Attempted to send to closed websocket")
+                return False
+                
+            message = json.dumps(data)
+            await websocket.send(message)
+            return True
+            
+        except websockets.exceptions.ConnectionClosed:
+            logger.debug(f"Client {websocket.remote_address} disconnected during send")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to send message to client {websocket.remote_address}: {e}")
+            return False
+    
     async def broadcast_message(self, data: Dict[str, Any]):
-        """Broadcast message to all connected clients"""
+        """Broadcast message to all connected clients - Fixed for websockets 11+"""
         if not self.clients:
             return
         
@@ -46,7 +103,7 @@ class WebSocketServer:
         
         for client in self.clients.copy():  # Use copy to avoid modification during iteration
             try:
-                if client.closed:
+                if self._is_websocket_closed(client):
                     disconnected_clients.add(client)
                     continue
                     
@@ -102,26 +159,8 @@ class WebSocketServer:
         await self.broadcast_message(message)
         logger.info(f"Broadcasted system message: {message_type} - {content}")
     
-    async def _send_to_client(self, websocket, data: Dict[str, Any]):
-        """Send message to a specific client with error handling"""
-        try:
-            if websocket.closed:
-                logger.warning("Attempted to send to closed websocket")
-                return False
-                
-            message = json.dumps(data)
-            await websocket.send(message)
-            return True
-            
-        except websockets.exceptions.ConnectionClosed:
-            logger.debug(f"Client {websocket.remote_address} disconnected during send")
-            return False
-        except Exception as e:
-            logger.error(f"Failed to send message to client {websocket.remote_address}: {e}")
-            return False
-    
-    async def _handle_client(self, websocket, path):
-        """Handle new client connection - FIXED METHOD SIGNATURE"""
+    async def _handle_client(self, websocket):
+        """Handle new client connection - Fixed for websockets 11+"""
         client_id = "unknown"
         
         try:
@@ -131,6 +170,8 @@ class WebSocketServer:
             except Exception:
                 client_id = "unknown_client"
                 
+            # Get path from websocket object (websockets 11+ change)
+            path = getattr(websocket, 'path', '/')
             logger.info(f"New client connection: {client_id} (path: {path})")
 
             # Add client to set immediately
@@ -190,8 +231,8 @@ class WebSocketServer:
                 self.clients.discard(websocket)
                 logger.info(f"Client {client_id} removed from set (Remaining: {len(self.clients)})")
                 
-                # Close websocket if still open
-                if not websocket.closed:
+                # Close websocket if still open - Fixed for websockets 11+
+                if hasattr(websocket, 'close') and not self._is_websocket_closed(websocket):
                     await websocket.close()
                     logger.debug(f"Closed websocket for {client_id}")
                     
@@ -242,14 +283,6 @@ class WebSocketServer:
         logger.info(f"Settings update received: {settings}")
         # TODO: Implement settings update logic
     
-    def get_client_count(self) -> int:
-        """Get number of connected clients"""
-        return len(self.clients)
-    
-    def is_running(self) -> bool:
-        """Check if server is running"""
-        return self.running and self.server is not None and not self.server.is_closing()
-    
     async def start(self):
         """Start the WebSocket server with enhanced error handling"""
         try:
@@ -291,7 +324,7 @@ class WebSocketServer:
             raise
     
     async def stop(self):
-        """Stop the WebSocket server gracefully"""
+        """Stop the WebSocket server gracefully - Fixed for websockets 11+"""
         logger.info("Stopping WebSocket server...")
         self.running = False
         
@@ -320,9 +353,9 @@ class WebSocketServer:
                 # Give clients time to process shutdown message
                 await asyncio.sleep(0.5)
                 
-                # Close all connections
+                # Close all connections - Fixed for websockets 11+
                 await asyncio.gather(
-                    *[client.close() for client in self.clients.copy() if not client.closed],
+                    *[client.close() for client in self.clients.copy() if not self._is_websocket_closed(client)],
                     return_exceptions=True
                 )
                 

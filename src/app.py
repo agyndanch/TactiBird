@@ -1,12 +1,14 @@
 """
-TactiBird Overlay - Main Application Class
+Fixed TFTCoachingApp - adds missing positioning_coach and fixes tesseract
 """
 
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from datetime import datetime
+import pytesseract
+import os
 
 from src.capture.screen_capture import ScreenCapture
 from src.vision.detection.board_analyzer import BoardAnalyzer
@@ -17,15 +19,21 @@ from src.ai.coaches.item_coach import ItemCoach
 from src.overlay.server.websocket_server import WebSocketServer
 from src.data.models.game_state import GameState
 from src.data.managers.data_manager import DataManager
+from src.ai.coaches.base_coach import CoachingSuggestion
 
-@dataclass
-class CoachingSuggestion:
-    """Represents a coaching suggestion"""
-    type: str
-    message: str
-    priority: int
-    timestamp: datetime
-    context: Dict[str, Any]
+# Configure Tesseract path for Windows
+if os.name == 'nt':  # Windows
+    # Try common installation paths
+    tesseract_paths = [
+        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+        r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+        r'C:\Users\{}\AppData\Local\Tesseract-OCR\tesseract.exe'.format(os.environ.get('USERNAME', '')),
+    ]
+    
+    for path in tesseract_paths:
+        if os.path.exists(path):
+            pytesseract.pytesseract.tesseract_cmd = path
+            break
 
 class TFTCoachingApp:
     """Main application class that orchestrates all components"""
@@ -56,6 +64,14 @@ class TFTCoachingApp:
             self.composition_coach = CompositionCoach(self.data_manager)
             self.item_coach = ItemCoach(self.data_manager)
             
+            # Create a placeholder positioning coach if it doesn't exist
+            try:
+                from src.ai.coaches.positioning_coach import PositioningCoach
+                self.positioning_coach = PositioningCoach(self.data_manager)
+            except ImportError:
+                self.logger.warning("PositioningCoach not found, creating placeholder")
+                self.positioning_coach = self._create_placeholder_coach("positioning")
+            
             # Overlay server
             self.websocket_server = WebSocketServer(
                 port=self.config.get('overlay', {}).get('port', 8765)
@@ -66,6 +82,22 @@ class TFTCoachingApp:
         except Exception as e:
             self.logger.error(f"Failed to initialize components: {e}")
             raise
+    
+    def _create_placeholder_coach(self, coach_type: str):
+        """Create a placeholder coach that returns no suggestions"""
+        class PlaceholderCoach:
+            def __init__(self, data_manager):
+                self.data_manager = data_manager
+                self.name = f"{coach_type.title()} Coach (Placeholder)"
+                self.enabled = False
+            
+            def get_suggestions(self, game_state: GameState) -> List[CoachingSuggestion]:
+                return []
+            
+            def is_applicable(self, game_state: GameState) -> bool:
+                return False
+        
+        return PlaceholderCoach(self.data_manager)
     
     async def run(self):
         """Main application loop"""
@@ -104,102 +136,110 @@ class TFTCoachingApp:
         
         while self.running:
             try:
-                # Capture current game state
+                # Capture screen
                 screenshot = await self.screen_capture.capture_async()
                 if screenshot is None:
                     await asyncio.sleep(update_interval)
                     continue
                 
-                # Analyze the game state
+                # Analyze game state
                 game_state = await self._analyze_game_state(screenshot)
                 if game_state is None:
                     await asyncio.sleep(update_interval)
                     continue
                 
-                # Generate coaching suggestions
+                # Generate suggestions
                 suggestions = await self._generate_suggestions(game_state)
                 
-                # Send suggestions to overlay
+                # Broadcast to overlay
                 if suggestions:
                     await self.websocket_server.broadcast_suggestions(suggestions)
                 
+                # Broadcast game state
+                await self.websocket_server.broadcast_game_state(game_state)
+                
+                # Wait for next update
                 await asyncio.sleep(update_interval)
                 
             except Exception as e:
-                self.logger.error(f"Error in coaching loop: {e}")
+                self.logger.error(f"Error in coaching loop: {e}", exc_info=True)
                 await asyncio.sleep(update_interval)
     
     async def _analyze_game_state(self, screenshot) -> Optional[GameState]:
-        """Analyze screenshot to extract game state"""
+        """Analyze current game state from screenshot"""
         try:
-            # Analyze board state
-            board_state = await asyncio.get_event_loop().run_in_executor(
+            # Run analysis in executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            
+            # Analyze board
+            board_state = await loop.run_in_executor(
                 None, self.board_analyzer.analyze, screenshot
             )
             
-            # Analyze shop state
-            shop_state = await asyncio.get_event_loop().run_in_executor(
+            # Analyze shop
+            shop_state = await loop.run_in_executor(
                 None, self.shop_analyzer.analyze, screenshot
             )
             
-            # Create game state object
-            game_state = GameState(
-                board=board_state,
-                shop=shop_state,
-                timestamp=datetime.now()
-            )
+            # Create game state with required timestamp
+            current_time = datetime.now()
+            game_state = GameState(timestamp=current_time)
+            
+            # Set analyzed states
+            game_state.board = board_state if board_state is not None else GameState(timestamp=current_time).board
+            game_state.shop = shop_state if shop_state is not None else GameState(timestamp=current_time).shop
             
             return game_state
             
         except Exception as e:
-            self.logger.error(f"Error analyzing game state: {e}")
+            self.logger.error(f"Game state analysis failed: {e}")
             return None
     
-    async def _generate_suggestions(self, game_state: GameState) -> list[CoachingSuggestion]:
-        """Generate coaching suggestions based on game state"""
+    async def _generate_suggestions(self, game_state: GameState) -> List[CoachingSuggestion]:
+        """Generate coaching suggestions from all coaches"""
         suggestions = []
         
         try:
-            # Get suggestions from each coach
             coaches = [
                 self.economy_coach,
                 self.composition_coach,
-                self.positioning_coach,
-                self.item_coach
+                self.item_coach,
+                self.positioning_coach
             ]
             
             for coach in coaches:
-                coach_suggestions = await asyncio.get_event_loop().run_in_executor(
-                    None, coach.get_suggestions, game_state
-                )
-                suggestions.extend(coach_suggestions)
+                if coach.is_applicable(game_state):
+                    coach_suggestions = coach.get_suggestions(game_state)
+                    suggestions.extend(coach_suggestions)
             
-            # Sort by priority
-            suggestions.sort(key=lambda x: x.priority, reverse=True)
+            # Sort by priority (highest first)
+            suggestions.sort(key=lambda s: s.priority, reverse=True)
             
-            # Limit number of suggestions
+            # Limit to max suggestions
             max_suggestions = self.config.get('ai', {}).get('max_suggestions', 5)
-            return suggestions[:max_suggestions]
+            suggestions = suggestions[:max_suggestions]
+            
+            return suggestions
             
         except Exception as e:
             self.logger.error(f"Error generating suggestions: {e}")
             return []
     
     async def stop(self):
-        """Stop the application"""
+        """Stop the application gracefully"""
         self.logger.info("Stopping TactiBird Overlay...")
         self.running = False
         
         try:
-            # Stop the WebSocket server
-            if self.websocket_server:
+            # Stop WebSocket server
+            if hasattr(self, 'websocket_server'):
                 await self.websocket_server.stop()
             
-            # Stop other components if needed
-            if hasattr(self.screen_capture, 'stop'):
-                await self.screen_capture.stop()
+            # Cleanup screen capture
+            if hasattr(self, 'screen_capture'):
+                self.screen_capture.cleanup()
                 
         except Exception as e:
-            self.logger.error(f"Error during shutdown: {e}")
+            self.logger.error(f"Error during cleanup: {e}")
         
         self.logger.info("TactiBird Overlay stopped")

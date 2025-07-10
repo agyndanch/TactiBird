@@ -13,6 +13,8 @@ class TFTOverlay {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
+
+        this.hasShownConnectedNotification = false;
         
         this.init();
     }
@@ -78,7 +80,12 @@ class TFTOverlay {
         console.log('WebSocket connected');
         this.reconnectAttempts = 0;
         this.uiManager.updateConnectionStatus('connected');
-        this.showNotification('Connected to TactiBird', 'success');
+        
+        // Only show notification once, not on every reconnect
+        if (!this.hasShownConnectedNotification) {
+            this.showNotification('Connected to TactiBird', 'success');
+            this.hasShownConnectedNotification = true;
+        }
     }
     
     onWebSocketMessage(data) {
@@ -239,6 +246,8 @@ class TFTOverlay {
     }
     
     loadSettings() {
+        localStorage.removeItem('tft-coach-settings');
+
         const defaultSettings = {
             overlay: {
                 opacity: 0.9,

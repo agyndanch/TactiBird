@@ -71,16 +71,29 @@ class TFTCoachingApp:
         """Main application loop"""
         self.running = True
         self.logger.info("Starting TactiBird Overlay...")
-        
+
         try:
-            # Start the overlay server
+            # Start the overlay server first and wait for it to be ready
+            self.logger.info("Starting WebSocket server...")
             await self.websocket_server.start()
-            
-            # Start the main coaching loop
+
+            # Verify server is running
+            if not self.websocket_server.is_running():
+                raise RuntimeError("WebSocket server failed to start properly")
+
+            self.logger.info(f"WebSocket server is running on port {self.websocket_server.port}")
+
+            # Add a small delay to ensure server is fully ready
+            await asyncio.sleep(0.5)
+
+            # Now start the main coaching loop
+            self.logger.info("Starting coaching loop...")
             await self._coaching_loop()
-            
+
+        except KeyboardInterrupt:
+            self.logger.info("Application interrupted by user")
         except Exception as e:
-            self.logger.error(f"Error in main loop: {e}")
+            self.logger.error(f"Error in main loop: {e}", exc_info=True)
             raise
         finally:
             await self.stop()
@@ -177,12 +190,16 @@ class TFTCoachingApp:
         self.logger.info("Stopping TactiBird Overlay...")
         self.running = False
         
-        # Stop overlay server
-        if hasattr(self, 'websocket_server'):
-            await self.websocket_server.stop()
+        try:
+            # Stop the WebSocket server
+            if self.websocket_server:
+                await self.websocket_server.stop()
+            
+            # Stop other components if needed
+            if hasattr(self.screen_capture, 'stop'):
+                await self.screen_capture.stop()
+                
+        except Exception as e:
+            self.logger.error(f"Error during shutdown: {e}")
         
-        # Cleanup screen capture
-        if hasattr(self, 'screen_capture'):
-            self.screen_capture.cleanup()
-        
-        self.logger.info("Application stopped")
+        self.logger.info("TactiBird Overlay stopped")

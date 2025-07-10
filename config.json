@@ -98,7 +98,7 @@
     "use_local_cache": true
   },
   "logging": {
-    "level": "INFO",
+    "level": "DEBUG",
     "file": "logs/app.log",
     "max_size": "10MB",
     "backup_count": 5

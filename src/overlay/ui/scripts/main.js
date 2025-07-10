@@ -61,18 +61,32 @@ class TFTOverlay {
         const wsUrl = `ws://localhost:${this.settings.overlay.port}`;
         
         try {
+            console.log(`Attempting to connect to ${wsUrl}`);
+
             this.websocket = new WebSocketClient(wsUrl, {
                 onOpen: () => this.onWebSocketOpen(),
                 onMessage: (data) => this.onWebSocketMessage(data),
                 onClose: () => this.onWebSocketClose(),
                 onError: (error) => this.onWebSocketError(error)
             });
-            
-            await this.websocket.connect();
-            
+
+            // Add connection timeout
+            const connectionPromise = this.websocket.connect();
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Connection timeout')), 10000);
+            });
+
+            await Promise.race([connectionPromise, timeoutPromise]);
+
         } catch (error) {
             console.error('Failed to connect to WebSocket:', error);
             this.showConnectionError();
+
+            // If this is the initial connection attempt, try again after a delay
+            if (this.reconnectAttempts === 0) {
+                console.log('Retrying connection in 2 seconds...');
+                setTimeout(() => this.attemptReconnect(), 2000);
+            }
         }
     }
     
@@ -116,14 +130,19 @@ class TFTOverlay {
     }
     
     onWebSocketClose() {
-        console.log('WebSocket disconnected');
+        console.log('WebSocket connection closed');
         this.uiManager.updateConnectionStatus('disconnected');
         
-        // Attempt to reconnect
+        // Only attempt reconnection if we haven't exceeded max attempts
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.attemptReconnect();
         } else {
-            this.showNotification('Connection lost. Please restart the application.', 'error');
+            console.error('Max reconnection attempts reached');
+            this.showNotification(
+                'Could not connect to TactiBird backend. Please restart the application.',
+                'error',
+                10000
+            );
         }
     }
     
@@ -187,7 +206,13 @@ class TFTOverlay {
     
     showConnectionError() {
         this.uiManager.updateConnectionStatus('disconnected');
-        this.showNotification('Failed to connect to TactiBird backend. Please ensure the application is running.', 'error', 10000);
+        
+        // Show more helpful error message
+        const errorMessage = this.reconnectAttempts === 0 
+            ? 'Failed to connect to TactiBird backend. Please ensure the application is running.'
+            : `Reconnection failed (${this.reconnectAttempts}/${this.maxReconnectAttempts}). Retrying...`;
+        
+        this.showNotification(errorMessage, 'error', 5000);
     }
     
     hideLoadingIndicator() {

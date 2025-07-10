@@ -8,7 +8,7 @@ import logging
 import websockets
 from typing import Set, Dict, Any, List
 from datetime import datetime
-
+from src.utils.network import is_port_available, find_available_port
 from src.ai.coaches.base_coach import CoachingSuggestion
 
 logger = logging.getLogger(__name__)
@@ -17,12 +17,22 @@ class WebSocketServer:
     """WebSocket server for overlay communication"""
     
     def __init__(self, port: int = 8765, host: str = "localhost"):
+        # Check if port is available first
+        if not is_port_available(host, port):
+            logger.warning(f"Port {port} is not available, trying to find alternative...")
+            try:
+                port = find_available_port(host, port)
+                logger.info(f"Using alternative port: {port}")
+            except RuntimeError as e:
+                logger.error(f"Could not find available port: {e}")
+                raise
+            
         self.port = port
         self.host = host
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
         self.server = None
         self.running = False
-        
+    
         logger.info(f"WebSocket server initialized on {host}:{port}")
     
     async def broadcast_message(self, data: Dict[str, Any]):
@@ -98,14 +108,31 @@ class WebSocketServer:
     async def start(self):
         """Start the WebSocket server"""
         try:
+            logger.info(f"Starting WebSocket server on {self.host}:{self.port}")
+
             self.server = await websockets.serve(
                 self._handle_client,
                 self.host,
-                self.port
+                self.port,
+                # Add server configuration for better stability
+                ping_interval=20,
+                ping_timeout=10,
+                close_timeout=10
             )
             self.running = True
-            logger.info(f"WebSocket server started on {self.host}:{self.port}")
-            
+            logger.info(f"WebSocket server started successfully on {self.host}:{self.port}")
+
+            # Wait a moment to ensure server is fully ready
+            await asyncio.sleep(0.1)
+
+        except OSError as e:
+            if e.errno == 10048:  # Address already in use (Windows)
+                logger.error(f"Port {self.port} is already in use. Please check if another instance is running or change the port in config.json")
+            elif e.errno == 98:   # Address already in use (Linux)
+                logger.error(f"Port {self.port} is already in use. Please check if another instance is running or change the port in config.json")
+            else:
+                logger.error(f"Failed to bind to {self.host}:{self.port} - {e}")
+            raise
         except Exception as e:
             logger.error(f"Failed to start WebSocket server: {e}")
             raise
@@ -131,36 +158,53 @@ class WebSocketServer:
     
     async def _handle_client(self, websocket, path):
         """Handle new client connection"""
-        client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-        logger.info(f"Client connected: {client_id}")
-        
-        # Add client to set
-        self.clients.add(websocket)
-        
         try:
-            # Send welcome message
-            welcome_msg = {
-                "type": "connection",
-                "status": "connected",
-                "timestamp": datetime.now().isoformat(),
-                "server_info": {
-                    "version": "1.0.0",
-                    "capabilities": ["suggestions", "game_state", "settings"]
+            client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+            logger.info(f"Client connected: {client_id}")
+
+            # Add client to set
+            self.clients.add(websocket)
+
+            try:
+                # Send welcome message
+                welcome_msg = {
+                    "type": "connection",
+                    "status": "connected",
+                    "timestamp": datetime.now().isoformat(),
+                    "server_info": {
+                        "version": "1.0.0",
+                        "capabilities": ["suggestions", "game_state", "settings"]
+                    }
                 }
-            }
-            await self._send_to_client(websocket, welcome_msg)
-            
-            # Handle client messages
-            async for message in websocket:
-                await self._handle_message(websocket, message)
-                
-        except websockets.exceptions.ConnectionClosed:
-            logger.info(f"Client disconnected: {client_id}")
+                await self._send_to_client(websocket, welcome_msg)
+
+                # Handle client messages
+                async for message in websocket:
+                    try:
+                        await self._handle_message(websocket, message)
+                    except Exception as e:
+                        logger.error(f"Error processing message from {client_id}: {e}")
+                        # Continue handling other messages
+
+            except websockets.exceptions.ConnectionClosed:
+                logger.info(f"Client disconnected cleanly: {client_id}")
+            except websockets.exceptions.ConnectionClosedError:
+                logger.info(f"Client disconnected unexpectedly: {client_id}")
+            except Exception as e:
+                logger.error(f"Error handling client {client_id}: {e}")
+            finally:
+                # Remove client from set
+                self.clients.discard(websocket)
+                logger.debug(f"Client {client_id} removed from client list")
+
         except Exception as e:
-            logger.error(f"Error handling client {client_id}: {e}")
-        finally:
-            # Remove client from set
-            self.clients.discard(websocket)
+            logger.error(f"Fatal error in client handler: {e}")
+            # Try to close the websocket if it's still open
+            try:
+                if not websocket.closed:
+                    await websocket.close()
+            except:
+                pass
     
     async def _handle_message(self, websocket, message: str):
         """Handle incoming message from client"""

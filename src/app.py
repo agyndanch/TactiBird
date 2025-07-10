@@ -13,7 +13,6 @@ from src.vision.detection.board_analyzer import BoardAnalyzer
 from src.vision.detection.shop_analyzer import ShopAnalyzer
 from src.ai.coaches.economy_coach import EconomyCoach
 from src.ai.coaches.composition_coach import CompositionCoach
-from src.ai.coaches.positioning_coach import PositioningCoach
 from src.ai.coaches.item_coach import ItemCoach
 from src.overlay.server.websocket_server import WebSocketServer
 from src.data.models.game_state import GameState
@@ -55,7 +54,6 @@ class TFTCoachingApp:
             # AI coaches
             self.economy_coach = EconomyCoach(self.data_manager)
             self.composition_coach = CompositionCoach(self.data_manager)
-            self.positioning_coach = PositioningCoach(self.data_manager)
             self.item_coach = ItemCoach(self.data_manager)
             
             # Overlay server

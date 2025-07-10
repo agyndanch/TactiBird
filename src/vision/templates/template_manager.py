@@ -15,11 +15,11 @@ import pickle
 logger = logging.getLogger(__name__)
 
 class TemplateManager:
-    """Manages template loading, caching, and updates"""
+    """Manages template loading, caching, and updates for TFT visual recognition"""
     
     def __init__(self):
-        self.template_cache = {}
-        self.template_metadata = {}
+        self.template_cache: Dict[str, np.ndarray] = {}
+        self.template_metadata: Dict[str, Dict[str, Any]] = {}
         self.cache_file = Path("cache/template_cache.pkl")
         self.metadata_file = Path("cache/template_metadata.json")
         
@@ -56,14 +56,54 @@ class TemplateManager:
             for category, directory in self.template_dirs.items():
                 templates = self.load_templates_from_directory(directory, category)
                 all_templates[category] = templates
-                
                 logger.info(f"Loaded {len(templates)} {category} templates")
             
             return all_templates
             
         except Exception as e:
-            logger.error(f"Failed to remove template {name}: {e}")
-            return False
+            logger.error(f"Failed to load all templates: {e}")
+            return {}
+    
+    def load_templates_from_directory(self, directory: Path, category: str) -> Dict[str, np.ndarray]:
+        """Load templates from a specific directory"""
+        try:
+            templates = {}
+            
+            if not directory.exists():
+                logger.warning(f"Template directory does not exist: {directory}")
+                return templates
+            
+            for file_path in directory.iterdir():
+                if file_path.suffix.lower() in self.supported_formats:
+                    template_name = file_path.stem
+                    
+                    # Check if template is in cache and up-to-date
+                    if self._is_template_cached(file_path, category):
+                        template = self._get_cached_template(file_path, category)
+                        if template is not None:
+                            templates[template_name] = template
+                            continue
+                    
+                    # Load template from file
+                    template = cv2.imread(str(file_path), cv2.IMREAD_COLOR)
+                    
+                    if template is not None:
+                        # Preprocess template
+                        processed_template = self._preprocess_template(template, category)
+                        templates[template_name] = processed_template
+                        
+                        # Cache the template
+                        self._cache_template(file_path, category, processed_template)
+                        
+                        logger.debug(f"Loaded template: {template_name}")
+                    else:
+                        logger.warning(f"Failed to load template: {file_path}")
+            
+            return templates
+            
+        except Exception as e:
+            logger.error(f"Failed to load templates from {directory}: {e}")
+            return {}
     
     def get_template_info(self) -> Dict[str, Any]:
         """Get information about loaded templates"""
@@ -83,7 +123,8 @@ class TemplateManager:
             # Calculate cache size (approximate)
             total_pixels = 0
             for template in self.template_cache.values():
-                total_pixels += template.size
+                if template is not None:
+                    total_pixels += template.size
             info['cache_size_mb'] = (total_pixels * 3) / (1024 * 1024)  # Assuming 3 bytes per pixel
             
             # Get last update time
@@ -216,7 +257,6 @@ class TemplateManager:
         """Export templates to directory"""
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
-            
             exported_count = 0
             
             for cache_key, template in self.template_cache.items():
@@ -407,53 +447,86 @@ class TemplateManager:
             logger.error(f"Failed to get cache statistics: {e}")
             return {}
     
-    def __del__(self):
-        """Destructor - save cache on exit"""
+    def add_template(self, name: str, template: np.ndarray, category: str) -> bool:
+        """Add a new template"""
         try:
-            self.save_cache()
-        except Exception:
-            passFailed to load all templates: {e}")
-            return {}
-    
-    def load_templates_from_directory(self, directory: Path, category: str) -> Dict[str, np.ndarray]:
-        """Load templates from a specific directory"""
-        try:
-            templates = {}
+            # Validate category
+            if category not in self.template_dirs:
+                logger.error(f"Invalid template category: {category}")
+                return False
             
-            if not directory.exists():
-                logger.warning(f"Template directory does not exist: {directory}")
-                return templates
+            # Preprocess template
+            processed = self._preprocess_template(template, category)
             
-            for file_path in directory.iterdir():
-                if file_path.suffix.lower() in self.supported_formats:
-                    template_name = file_path.stem
-                    
-                    # Check if template is in cache and up-to-date
-                    if self._is_template_cached(file_path, category):
-                        template = self._get_cached_template(file_path, category)
-                        if template is not None:
-                            templates[template_name] = template
-                            continue
-                    
-                    # Load template from file
-                    template = cv2.imread(str(file_path), cv2.IMREAD_COLOR)
-                    
-                    if template is not None:
-                        # Preprocess template
-                        processed_template = self._preprocess_template(template, category)
-                        templates[template_name] = processed_template
-                        
-                        # Cache the template
-                        self._cache_template(file_path, category, processed_template)
-                        
-                        logger.debug(f"Loaded template: {template_name}")
-                    else:
-                        logger.warning(f"Failed to load template: {file_path}")
+            # Save to appropriate directory
+            template_dir = self.template_dirs[category]
+            template_path = template_dir / f"{name}.png"
             
-            return templates
+            success = cv2.imwrite(str(template_path), processed)
+            
+            if success:
+                # Add to cache
+                cache_key = f"{category}_{name}"
+                self.template_cache[cache_key] = processed
+                self.template_metadata[cache_key] = {
+                    'path': str(template_path),
+                    'category': category,
+                    'hash': self._get_file_hash(template_path),
+                    'size': processed.shape,
+                    'cached_at': datetime.now().isoformat()
+                }
+                
+                logger.info(f"Added template: {name} ({category})")
+                return True
+            
+            return False
             
         except Exception as e:
-            logger.error(f"Failed to load templates from {directory}: {e}")
+            logger.error(f"Failed to add template {name}: {e}")
+            return False
+    
+    def remove_template(self, name: str, category: str) -> bool:
+        """Remove a template"""
+        try:
+            # Remove from cache
+            cache_key = f"{category}_{name}"
+            if cache_key in self.template_cache:
+                del self.template_cache[cache_key]
+            if cache_key in self.template_metadata:
+                del self.template_metadata[cache_key]
+            
+            # Remove file
+            template_path = self.template_dirs[category] / f"{name}.png"
+            if template_path.exists():
+                template_path.unlink()
+            
+            logger.info(f"Removed template: {name} ({category})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to remove template {name}: {e}")
+            return False
+    
+    def get_template(self, name: str, category: str) -> Optional[np.ndarray]:
+        """Get a specific template"""
+        try:
+            cache_key = f"{category}_{name}"
+            return self.template_cache.get(cache_key)
+        except Exception as e:
+            logger.error(f"Failed to get template {name}: {e}")
+            return None
+    
+    def get_templates_by_category(self, category: str) -> Dict[str, np.ndarray]:
+        """Get all templates for a specific category"""
+        try:
+            templates = {}
+            for cache_key, template in self.template_cache.items():
+                if cache_key.startswith(f"{category}_"):
+                    template_name = '_'.join(cache_key.split('_')[1:])
+                    templates[template_name] = template
+            return templates
+        except Exception as e:
+            logger.error(f"Failed to get templates for category {category}: {e}")
             return {}
     
     def _preprocess_template(self, template: np.ndarray, category: str) -> np.ndarray:
@@ -463,14 +536,13 @@ class TemplateManager:
             
             # Category-specific preprocessing
             if category == 'champions':
-                # Champions might need specific preprocessing
                 processed = self._preprocess_champion_template(processed)
             elif category == 'items':
-                # Items might need different preprocessing
                 processed = self._preprocess_item_template(processed)
             elif category == 'ui':
-                # UI elements might need edge enhancement
                 processed = self._preprocess_ui_template(processed)
+            elif category == 'traits':
+                processed = self._preprocess_trait_template(processed)
             
             # General preprocessing
             processed = self._apply_general_preprocessing(processed)
@@ -528,6 +600,21 @@ class TemplateManager:
             
         except Exception as e:
             logger.error(f"UI template preprocessing failed: {e}")
+            return template
+    
+    def _preprocess_trait_template(self, template: np.ndarray) -> np.ndarray:
+        """Preprocess trait templates"""
+        try:
+            # Traits need color enhancement
+            processed = self._enhance_features(template)
+            
+            # Apply slight blur to reduce noise
+            processed = cv2.GaussianBlur(processed, (3, 3), 0)
+            
+            return processed
+            
+        except Exception as e:
+            logger.error(f"Trait template preprocessing failed: {e}")
             return template
     
     def _apply_general_preprocessing(self, template: np.ndarray) -> np.ndarray:
@@ -705,56 +792,9 @@ class TemplateManager:
         except Exception as e:
             logger.error(f"Failed to clear cache: {e}")
     
-    def add_template(self, name: str, template: np.ndarray, category: str) -> bool:
-        """Add a new template"""
+    def __del__(self):
+        """Destructor - save cache on exit"""
         try:
-            # Preprocess template
-            processed = self._preprocess_template(template, category)
-            
-            # Save to appropriate directory
-            template_dir = self.template_dirs[category]
-            template_path = template_dir / f"{name}.png"
-            
-            success = cv2.imwrite(str(template_path), processed)
-            
-            if success:
-                # Add to cache
-                cache_key = f"{category}_{name}"
-                self.template_cache[cache_key] = processed
-                self.template_metadata[cache_key] = {
-                    'path': str(template_path),
-                    'category': category,
-                    'hash': self._get_file_hash(template_path),
-                    'size': processed.shape,
-                    'cached_at': datetime.now().isoformat()
-                }
-                
-                logger.info(f"Added template: {name} ({category})")
-                return True
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"Failed to add template {name}: {e}")
-            return False
-    
-    def remove_template(self, name: str, category: str) -> bool:
-        """Remove a template"""
-        try:
-            # Remove from cache
-            cache_key = f"{category}_{name}"
-            if cache_key in self.template_cache:
-                del self.template_cache[cache_key]
-            if cache_key in self.template_metadata:
-                del self.template_metadata[cache_key]
-            
-            # Remove file
-            template_path = self.template_dirs[category] / f"{name}.png"
-            if template_path.exists():
-                template_path.unlink()
-            
-            logger.info(f"Removed template: {name} ({category})")
-            return True
-            
-        except Exception as e:
-            logger.error(f"
+            self.save_cache()
+        except Exception:
+            pass

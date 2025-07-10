@@ -1,5 +1,5 @@
 """
-TactiBird Overlay - WebSocket Server (Fixed)
+TactiBird Overlay - WebSocket Server (Enhanced Error Handling)
 """
 
 import asyncio
@@ -32,6 +32,7 @@ class WebSocketServer:
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
         self.server = None
         self.running = False
+        self.shutdown_event = asyncio.Event()
     
         logger.info(f"WebSocket server initialized on {host}:{port}")
     
@@ -43,17 +44,27 @@ class WebSocketServer:
         message = json.dumps(data)
         disconnected_clients = set()
         
-        for client in self.clients:
+        for client in self.clients.copy():  # Use copy to avoid modification during iteration
             try:
+                if client.closed:
+                    disconnected_clients.add(client)
+                    continue
+                    
                 await client.send(message)
+                logger.debug(f"Message sent to client {client.remote_address}")
+                
             except websockets.exceptions.ConnectionClosed:
+                logger.debug(f"Client {client.remote_address} disconnected during broadcast")
                 disconnected_clients.add(client)
             except Exception as e:
-                logger.error(f"Failed to send message to client: {e}")
+                logger.error(f"Failed to send message to client {client.remote_address}: {e}")
                 disconnected_clients.add(client)
         
         # Remove disconnected clients
         self.clients -= disconnected_clients
+        
+        if disconnected_clients:
+            logger.info(f"Removed {len(disconnected_clients)} disconnected clients")
     
     async def broadcast_suggestions(self, suggestions: List[CoachingSuggestion]):
         """Broadcast coaching suggestions to all clients"""
@@ -91,11 +102,145 @@ class WebSocketServer:
         await self.broadcast_message(message)
         logger.info(f"Broadcasted system message: {message_type} - {content}")
     
+    async def _send_to_client(self, websocket, data: Dict[str, Any]):
+        """Send message to a specific client with error handling"""
+        try:
+            if websocket.closed:
+                logger.warning("Attempted to send to closed websocket")
+                return False
+                
+            message = json.dumps(data)
+            await websocket.send(message)
+            return True
+            
+        except websockets.exceptions.ConnectionClosed:
+            logger.debug(f"Client {websocket.remote_address} disconnected during send")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to send message to client {websocket.remote_address}: {e}")
+            return False
+    
+    async def _handle_client(self, websocket, path):
+        """Handle new client connection - FIXED METHOD SIGNATURE"""
+        client_id = "unknown"
+        
+        try:
+            # Get client info safely
+            try:
+                client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+            except Exception:
+                client_id = "unknown_client"
+                
+            logger.info(f"New client connection: {client_id} (path: {path})")
+
+            # Add client to set immediately
+            self.clients.add(websocket)
+            logger.info(f"Client added to set: {client_id} (Total clients: {len(self.clients)})")
+
+            try:
+                # Send welcome message
+                welcome_msg = {
+                    "type": "connection",
+                    "status": "connected",
+                    "timestamp": datetime.now().isoformat(),
+                    "server_info": {
+                        "version": "1.0.0",
+                        "capabilities": ["suggestions", "game_state", "system_messages", "settings"],
+                        "client_id": client_id,
+                        "path": path
+                    }
+                }
+                
+                success = await self._send_to_client(websocket, welcome_msg)
+                if not success:
+                    logger.warning(f"Failed to send welcome message to {client_id}")
+                    return
+                
+                logger.info(f"Welcome message sent to {client_id}")
+
+                # Handle client messages in a loop
+                async for message in websocket:
+                    try:
+                        await self._handle_message(websocket, message, client_id)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Invalid JSON from {client_id}: {e}")
+                        await self._send_to_client(websocket, {
+                            "type": "error",
+                            "message": "Invalid JSON format"
+                        })
+                    except Exception as e:
+                        logger.error(f"Error processing message from {client_id}: {e}")
+                        # Continue handling other messages rather than breaking
+
+            except websockets.exceptions.ConnectionClosed:
+                logger.info(f"Client {client_id} disconnected normally")
+            except websockets.exceptions.ConnectionClosedError as e:
+                logger.info(f"Client {client_id} disconnected unexpectedly: {e}")
+            except asyncio.CancelledError:
+                logger.info(f"Client {client_id} handler cancelled")
+                raise  # Re-raise to properly handle cancellation
+            except Exception as e:
+                logger.error(f"Unexpected error handling client {client_id}: {e}", exc_info=True)
+
+        except Exception as e:
+            logger.error(f"Fatal error in client handler for {client_id}: {e}", exc_info=True)
+        finally:
+            # Always clean up the client
+            try:
+                self.clients.discard(websocket)
+                logger.info(f"Client {client_id} removed from set (Remaining: {len(self.clients)})")
+                
+                # Close websocket if still open
+                if not websocket.closed:
+                    await websocket.close()
+                    logger.debug(f"Closed websocket for {client_id}")
+                    
+            except Exception as e:
+                logger.error(f"Error during cleanup for {client_id}: {e}")
+    
+    async def _handle_message(self, websocket, message: str, client_id: str):
+        """Handle incoming message from client"""
+        try:
+            data = json.loads(message)
+            message_type = data.get("type", "unknown")
+            
+            logger.debug(f"Received message from {client_id}: {message_type}")
+            
+            if message_type == "ping":
+                # Respond to ping with pong
+                await self._send_to_client(websocket, {
+                    "type": "pong",
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+            elif message_type == "get_suggestions":
+                # Client requesting current suggestions
+                logger.debug(f"Client {client_id} requested suggestions")
+                # TODO: Implement suggestion retrieval
+                
+            elif message_type == "settings_update":
+                # Client updating settings
+                settings = data.get("settings", {})
+                await self._handle_settings_update(settings)
+                
+            else:
+                logger.warning(f"Unknown message type from {client_id}: {message_type}")
+                await self._send_to_client(websocket, {
+                    "type": "error",
+                    "message": f"Unknown message type: {message_type}"
+                })
+                
+        except Exception as e:
+            logger.error(f"Error handling message from {client_id}: {e}", exc_info=True)
+            await self._send_to_client(websocket, {
+                "type": "error",
+                "message": "Internal server error"
+            })
+    
     async def _handle_settings_update(self, settings: Dict[str, Any]):
         """Handle settings update from client"""
-        # TODO: Implement settings update logic
-        # This could update overlay appearance, coach preferences, etc.
         logger.info(f"Settings update received: {settings}")
+        # TODO: Implement settings update logic
     
     def get_client_count(self) -> int:
         """Get number of connected clients"""
@@ -103,27 +248,35 @@ class WebSocketServer:
     
     def is_running(self) -> bool:
         """Check if server is running"""
-        return self.running and self.server is not None
+        return self.running and self.server is not None and not self.server.is_closing()
     
     async def start(self):
-        """Start the WebSocket server"""
+        """Start the WebSocket server with enhanced error handling"""
         try:
             logger.info(f"Starting WebSocket server on {self.host}:{self.port}")
 
+            # Create server with enhanced configuration
             self.server = await websockets.serve(
                 self._handle_client,
                 self.host,
                 self.port,
-                # Add server configuration for better stability
-                ping_interval=20,
-                ping_timeout=10,
-                close_timeout=10
+                # Enhanced server configuration
+                ping_interval=30,      # Send ping every 30 seconds
+                ping_timeout=10,       # Wait 10 seconds for pong
+                close_timeout=10,      # Wait 10 seconds for close
+                max_size=2**20,        # 1MB max message size
+                max_queue=32,          # Max queued messages per client
             )
+            
             self.running = True
             logger.info(f"WebSocket server started successfully on {self.host}:{self.port}")
 
             # Wait a moment to ensure server is fully ready
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.2)
+            
+            # Test server is actually running
+            if not self.is_running():
+                raise RuntimeError("Server failed to start properly")
 
         except OSError as e:
             if e.errno == 10048:  # Address already in use (Windows)
@@ -134,119 +287,64 @@ class WebSocketServer:
                 logger.error(f"Failed to bind to {self.host}:{self.port} - {e}")
             raise
         except Exception as e:
-            logger.error(f"Failed to start WebSocket server: {e}")
+            logger.error(f"Failed to start WebSocket server: {e}", exc_info=True)
             raise
     
     async def stop(self):
-        """Stop the WebSocket server"""
+        """Stop the WebSocket server gracefully"""
+        logger.info("Stopping WebSocket server...")
         self.running = False
         
-        # Close all client connections
-        if self.clients:
-            await asyncio.gather(
-                *[client.close() for client in self.clients],
-                return_exceptions=True
-            )
-            self.clients.clear()
+        try:
+            # Signal shutdown
+            self.shutdown_event.set()
+            
+            # Close all client connections gracefully
+            if self.clients:
+                logger.info(f"Closing {len(self.clients)} client connections...")
+                
+                # Send shutdown notification
+                shutdown_msg = {
+                    "type": "system_message",
+                    "message_type": "info",
+                    "content": "Server shutting down",
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # Try to notify clients of shutdown
+                await asyncio.gather(
+                    *[self._send_to_client(client, shutdown_msg) for client in self.clients.copy()],
+                    return_exceptions=True
+                )
+                
+                # Give clients time to process shutdown message
+                await asyncio.sleep(0.5)
+                
+                # Close all connections
+                await asyncio.gather(
+                    *[client.close() for client in self.clients.copy() if not client.closed],
+                    return_exceptions=True
+                )
+                
+                self.clients.clear()
+            
+            # Close the server
+            if self.server:
+                self.server.close()
+                await self.server.wait_closed()
+                logger.info("WebSocket server closed successfully")
         
-        # Close the server
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
+        except Exception as e:
+            logger.error(f"Error during server shutdown: {e}", exc_info=True)
         
         logger.info("WebSocket server stopped")
     
-    async def _handle_client(self, websocket, path):
-        """Handle new client connection"""
-        try:
-            client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
-            logger.info(f"Client connected: {client_id}")
-
-            # Add client to set
-            self.clients.add(websocket)
-
-            try:
-                # Send welcome message
-                welcome_msg = {
-                    "type": "connection",
-                    "status": "connected",
-                    "timestamp": datetime.now().isoformat(),
-                    "server_info": {
-                        "version": "1.0.0",
-                        "capabilities": ["suggestions", "game_state", "settings"]
-                    }
-                }
-                await self._send_to_client(websocket, welcome_msg)
-
-                # Handle client messages
-                async for message in websocket:
-                    try:
-                        await self._handle_message(websocket, message)
-                    except Exception as e:
-                        logger.error(f"Error processing message from {client_id}: {e}")
-                        # Continue handling other messages
-
-            except websockets.exceptions.ConnectionClosed:
-                logger.info(f"Client disconnected cleanly: {client_id}")
-            except websockets.exceptions.ConnectionClosedError:
-                logger.info(f"Client disconnected unexpectedly: {client_id}")
-            except Exception as e:
-                logger.error(f"Error handling client {client_id}: {e}")
-            finally:
-                # Remove client from set
-                self.clients.discard(websocket)
-                logger.debug(f"Client {client_id} removed from client list")
-
-        except Exception as e:
-            logger.error(f"Fatal error in client handler: {e}")
-            # Try to close the websocket if it's still open
-            try:
-                if not websocket.closed:
-                    await websocket.close()
-            except:
-                pass
-    
-    async def _handle_message(self, websocket, message: str):
-        """Handle incoming message from client"""
-        try:
-            data = json.loads(message)
-            message_type = data.get("type")
-            
-            if message_type == "ping":
-                await self._send_to_client(websocket, {
-                    "type": "pong",
-                    "timestamp": datetime.now().isoformat()
-                })
-            
-            elif message_type == "get_suggestions":
-                # Client requesting current suggestions
-                await self._send_to_client(websocket, {
-                    "type": "suggestions_request_acknowledged",
-                    "timestamp": datetime.now().isoformat()
-                })
-            
-            elif message_type == "settings_update":
-                # Handle settings updates
-                settings = data.get("settings", {})
-                await self._handle_settings_update(settings)
-                
-                await self._send_to_client(websocket, {
-                    "type": "settings_updated",
-                    "timestamp": datetime.now().isoformat()
-                })
-            
-            else:
-                logger.warning(f"Unknown message type: {message_type}")
-                
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON received from client")
-        except Exception as e:
-            logger.error(f"Error handling message: {e}")
-    
-    async def _send_to_client(self, websocket, data: Dict[str, Any]):
-        """Send data to specific client"""
-        try:
-            message = json.dumps(data)
-            await websocket.send(message)
-        except Exception as e:
-            logger.error(f"Failed to send message to client: {e}")
+    async def health_check(self) -> Dict[str, Any]:
+        """Get server health status"""
+        return {
+            "running": self.is_running(),
+            "client_count": self.get_client_count(),
+            "port": self.port,
+            "host": self.host,
+            "timestamp": datetime.now().isoformat()
+        }

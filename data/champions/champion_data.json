@@ -1,0 +1,74 @@
+{
+  "graves": {
+    "tier": 1,
+    "traits": [
+      "Gunslinger",
+      "Outlaw"
+    ],
+    "recommended_items": [
+      "Infinity Edge",
+      "Last Whisper",
+      "Bloodthirster"
+    ]
+  },
+  "nidalee": {
+    "tier": 1,
+    "traits": [
+      "Yordle",
+      "Shapeshifter"
+    ],
+    "recommended_items": [
+      "Rabadon's Deathcap",
+      "Ionic Spark",
+      "Morellonomicon"
+    ]
+  },
+  "tristana": {
+    "tier": 2,
+    "traits": [
+      "Yordle",
+      "Gunslinger"
+    ],
+    "recommended_items": [
+      "Rapid Firecannon",
+      "Infinity Edge",
+      "Phantom Dancer"
+    ]
+  },
+  "lux": {
+    "tier": 3,
+    "traits": [
+      "Academy",
+      "Arcanist"
+    ],
+    "recommended_items": [
+      "Archangel's Staff",
+      "Rabadon's Deathcap",
+      "Blue Buff"
+    ]
+  },
+  "jinx": {
+    "tier": 4,
+    "traits": [
+      "Scrap",
+      "Twinshot"
+    ],
+    "recommended_items": [
+      "Last Whisper",
+      "Infinity Edge",
+      "Hurricane"
+    ]
+  },
+  "kayn": {
+    "tier": 5,
+    "traits": [
+      "Challenger",
+      "Assassin"
+    ],
+    "recommended_items": [
+      "Infinity Edge",
+      "Bloodthirster",
+      "Guardian Angel"
+    ]
+  }
+}

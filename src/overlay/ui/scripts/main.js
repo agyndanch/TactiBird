@@ -244,7 +244,8 @@ class TFTOverlay {
                 opacity: 0.9,
                 alwaysOnTop: true,
                 theme: 'dark',
-                position: { x: 20, y: 20 }
+                position: { x: 20, y: 20 },
+                port: 8765
             },
             coaches: {
                 economy: true,

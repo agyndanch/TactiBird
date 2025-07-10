@@ -5,7 +5,7 @@ TactiBird Overlay - Shop Analyzer
 import logging
 import cv2
 import numpy as np
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 from dataclasses import dataclass
 
 from src.data.models.game_state import ShopState, Champion, ChampionTier

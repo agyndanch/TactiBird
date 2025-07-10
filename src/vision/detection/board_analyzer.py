@@ -3,9 +3,8 @@ TactiBird Overlay - Board State Analyzer
 """
 
 import logging
-import cv2
 import numpy as np
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 from dataclasses import dataclass
 
 from src.data.models.game_state import BoardState, Champion, Position, ChampionTier, Trait

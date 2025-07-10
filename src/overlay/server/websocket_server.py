@@ -1,5 +1,5 @@
 """
-TactiBird Overlay - WebSocket Server
+TactiBird Overlay - WebSocket Server (Fixed)
 """
 
 import asyncio
@@ -93,7 +93,9 @@ class WebSocketServer:
     
     def is_running(self) -> bool:
         """Check if server is running"""
-        return self.running and self.server is not None start(self):
+        return self.running and self.server is not None
+    
+    async def start(self):
         """Start the WebSocket server"""
         try:
             self.server = await websockets.serve(
@@ -204,5 +206,3 @@ class WebSocketServer:
             await websocket.send(message)
         except Exception as e:
             logger.error(f"Failed to send message to client: {e}")
-    
-    async def

@@ -8,12 +8,18 @@ import asyncio
 import logging
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add both src and parent directory to path to work from anywhere
+current_dir = Path(__file__).parent
+root_dir = current_dir.parent
 
-from src.app import TFTCoachingApp
-from src.logger import setup_logger
-from src.config import load_config
+# Add src directory to path
+sys.path.insert(0, str(current_dir))
+# Add root directory to path (in case config.json is there)
+sys.path.insert(0, str(root_dir))
+
+from app import TFTCoachingApp
+from logger import setup_logger
+from config import load_config
 
 def main():
     """Main application entry point"""

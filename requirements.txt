@@ -1,36 +1,36 @@
-# Core dependencies
-opencv-python==4.8.0.74
-pytesseract==0.3.10
-Pillow==9.5.0
-numpy==1.24.3
+# Core dependencies - Updated for compatibility
+opencv-python>=4.8.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
+numpy>=1.24.0
 
-# Machine Learning
-torch==2.0.1
-torchvision==0.15.2
-scikit-learn==1.3.0
+# Machine Learning - Compatible versions
+torch>=2.0.0
+torchvision>=0.15.0
+scikit-learn>=1.3.0
 
 # Web and Communication
-websockets==11.0.3
-aiohttp==3.8.4
-requests==2.31.0
+websockets>=11.0.0
+aiohttp>=3.8.0
+requests>=2.31.0
 
 # Data Processing
-pandas==2.0.3
-pydantic==2.0.3
+pandas>=2.0.0
+pydantic>=2.0.0
 
 # Screen Capture
-mss==9.0.1
+mss>=9.0.0
 
 # Utilities
-python-dotenv==1.0.0
-loguru==0.7.0
+python-dotenv>=1.0.0
+loguru>=0.7.0
 
 # Development
-pytest==7.4.0
-pytest-asyncio==0.21.1
-black==23.7.0
-flake8==6.0.0
-mypy==1.5.1
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.7.0
+flake8>=6.0.0
+mypy>=1.5.0
 
 # Optional OCR improvements
-easyocr==1.7.0
+easyocr>=1.7.0

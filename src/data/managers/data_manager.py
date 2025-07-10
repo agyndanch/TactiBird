@@ -6,7 +6,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-import requests
 from datetime import datetime, timedelta
 
 from src.data.models.game_state import Champion, ChampionTier, Item, Trait

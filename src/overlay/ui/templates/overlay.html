@@ -1,183 +1,374 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TactiBird</title>
-    <link rel="stylesheet" href="../styles/main.css">
-    <link rel="stylesheet" href="../styles/overlay.css">
-    <link rel="stylesheet" href="../styles/themes/dark.css">
-</head>
-<body>
-    <div id="overlay-container" class="overlay-container">
-        <!-- Header with status -->
-        <div id="header" class="header">
-            <div class="status-indicator">
-                <span id="connection-status" class="status-dot disconnected"></span>
-                <span class="status-text">TactiBird</span>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>TFT Economy Overlay</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 10px;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+                font-size: 14px;
+                min-width: 300px;
+                border-radius: 8px;
+            }
+
+            .overlay-container {
+                background: linear-gradient(135deg, rgba(30, 30, 30, 0.95), rgba(50, 50, 50, 0.95));
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+                padding: 15px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            }
+
+            .header {
+                text-align: center;
+                font-weight: bold;
+                font-size: 16px;
+                margin-bottom: 15px;
+                color: #FFD700;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            }
+
+            .stats-section {
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 6px;
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+
+            .stat-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 5px;
+            }
+
+            .stat-label {
+                color: #CCCCCC;
+            }
+
+            .stat-value {
+                font-weight: bold;
+            }
+
+            .gold-value {
+                color: #FFD700;
+            }
+
+            .health-value {
+                color: #FF6B6B;
+            }
+
+            .level-value {
+                color: #74C0FC;
+            }
+
+            .economy-status {
+                background: rgba(0, 100, 0, 0.2);
+                border-left: 3px solid #4CAF50;
+                padding: 8px 10px;
+                margin-bottom: 15px;
+                border-radius: 4px;
+            }
+
+            .economy-status.weak {
+                background: rgba(100, 100, 0, 0.2);
+                border-left-color: #FFC107;
+            }
+
+            .economy-status.very-weak {
+                background: rgba(100, 0, 0, 0.2);
+                border-left-color: #F44336;
+            }
+
+            .suggestions-section {
+                margin-top: 15px;
+            }
+
+            .suggestion {
+                background: rgba(30, 30, 30, 0.8);
+                border-left: 3px solid #2196F3;
+                padding: 8px 10px;
+                margin-bottom: 8px;
+                border-radius: 4px;
+                font-size: 13px;
+            }
+
+            .suggestion.priority-high {
+                border-left-color: #FF5722;
+                background: rgba(100, 20, 20, 0.3);
+            }
+
+            .suggestion.priority-medium {
+                border-left-color: #FF9800;
+                background: rgba(100, 50, 0, 0.3);
+            }
+
+            .suggestion.priority-low {
+                border-left-color: #4CAF50;
+            }
+
+            .suggestion.emergency {
+                border-left-color: #F44336;
+                background: rgba(244, 67, 54, 0.2);
+                animation: pulse 1.5s infinite;
+            }
+
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.7; }
+                100% { opacity: 1; }
+            }
+
+            .no-data {
+                text-align: center;
+                color: #888;
+                font-style: italic;
+                padding: 20px;
+            }
+
+            .connection-status {
+                position: absolute;
+                top: 5px;
+                right: 5px;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #F44336;
+            }
+
+            .connection-status.connected {
+                background: #4CAF50;
+            }
+
+            .confidence-indicator {
+                font-size: 11px;
+                color: #888;
+                margin-left: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="overlay-container">
+            <div class="connection-status" id="connectionStatus"></div>
+
+            <div class="header">
+                TFT Economy Coach
             </div>
-            <div class="controls">
-                <button id="minimize-btn" class="control-btn" title="Minimize">_</button>
-                <button id="settings-btn" class="control-btn" title="Settings">⚙</button>
-                <button id="close-btn" class="control-btn close" title="Close">×</button>
+
+            <div class="stats-section" id="statsSection">
+                <div class="stat-row">
+                    <span class="stat-label">Gold:</span>
+                    <span class="stat-value gold-value" id="goldValue">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Health:</span>
+                    <span class="stat-value health-value" id="healthValue">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Level:</span>
+                    <span class="stat-value level-value" id="levelValue">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Stage:</span>
+                    <span class="stat-value" id="stageValue">--</span>
+                </div>
+            </div>
+
+            <div class="economy-status" id="economyStatus">
+                Economy: <span id="economyStrength">Unknown</span>
+                <br>
+                Interest: <span id="interestValue">0</span>/5
+                <br>
+                Next breakpoint: <span id="nextBreakpoint">--</span>
+            </div>
+
+            <div class="suggestions-section">
+                <div style="font-weight: bold; margin-bottom: 8px; color: #FFD700;">Suggestions:</div>
+                <div id="suggestionsContainer">
+                    <div class="no-data">Waiting for game data...</div>
+                </div>
             </div>
         </div>
 
-        <!-- Main content area -->
-        <div id="main-content" class="main-content">
-            <!-- Game State Display -->
-            <div id="game-state" class="game-state-panel">
-                <div class="stat-group">
-                    <div class="stat-item">
-                        <span class="stat-label">Stage</span>
-                        <span id="stage-round" class="stat-value">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Gold</span>
-                        <span id="gold-value" class="stat-value">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Health</span>
-                        <span id="health-value" class="stat-value">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Level</span>
-                        <span id="level-value" class="stat-value">-</span>
-                    </div>
-                </div>
-            </div>
+        <script>
+            class TFTOverlay {
+                constructor() {
+                    this.websocket = null;
+                    this.reconnectInterval = 3000; // 3 seconds
+                    this.isConnected = false;
 
-            <!-- Suggestions Panel -->
-            <div id="suggestions-panel" class="suggestions-panel">
-                <div class="panel-header">
-                    <h3>AI Suggestions</h3>
-                    <span id="suggestion-count" class="suggestion-count">0</span>
-                </div>
-                <div id="suggestions-list" class="suggestions-list">
-                    <!-- Suggestions will be populated here -->
-                    <div class="no-suggestions">
-                        <p>Waiting for game data...</p>
-                    </div>
-                </div>
-            </div>
+                    this.elements = {
+                        connectionStatus: document.getElementById('connectionStatus'),
+                        goldValue: document.getElementById('goldValue'),
+                        healthValue: document.getElementById('healthValue'),
+                        levelValue: document.getElementById('levelValue'),
+                        stageValue: document.getElementById('stageValue'),
+                        economyStatus: document.getElementById('economyStatus'),
+                        economyStrength: document.getElementById('economyStrength'),
+                        interestValue: document.getElementById('interestValue'),
+                        nextBreakpoint: document.getElementById('nextBreakpoint'),
+                        suggestionsContainer: document.getElementById('suggestionsContainer')
+                    };
 
-            <!-- Economy Panel -->
-            <div id="economy-panel" class="economy-panel">
-                <div class="panel-header">
-                    <h4>Economy</h4>
-                </div>
-                <div class="economy-info">
-                    <div class="economy-item">
-                        <span class="label">Interest:</span>
-                        <span id="interest-value" class="value">0</span>
-                    </div>
-                    <div class="economy-item">
-                        <span class="label">Next Breakpoint:</span>
-                        <span id="next-breakpoint" class="value">10g</span>
-                    </div>
-                    <div class="economy-item">
-                        <span class="label">Economy Strength:</span>
-                        <span id="economy-strength" class="value economy-weak">Weak</span>
-                    </div>
-                </div>
-            </div>
+                    this.connect();
+                }
 
-            <!-- Composition Panel -->
-            <div id="composition-panel" class="composition-panel">
-                <div class="panel-header">
-                    <h4>Team Composition</h4>
-                </div>
-                <div id="active-traits" class="active-traits">
-                    <!-- Active traits will be displayed here -->
-                </div>
-                <div id="recommended-comp" class="recommended-comp">
-                    <p class="placeholder">Analyzing composition...</p>
-                </div>
-            </div>
-        </div>
+                connect() {
+                    try {
+                        this.websocket = new WebSocket('ws://localhost:8765');
 
-        <!-- Notification System -->
-        <div id="notifications" class="notifications">
-            <!-- Notifications will appear here -->
-        </div>
+                        this.websocket.onopen = () => {
+                            console.log('Connected to TFT overlay backend');
+                            this.isConnected = true;
+                            this.updateConnectionStatus();
+                        };
 
-        <!-- Settings Modal -->
-        <div id="settings-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Settings</h3>
-                    <button id="close-settings" class="control-btn">×</button>
-                </div>
-                <div class="modal-body">
-                    <div class="setting-group">
-                        <h4>Display</h4>
-                        <label class="setting-item">
-                            <input type="range" id="opacity-slider" min="0.1" max="1" step="0.1" value="0.9">
-                            <span>Opacity</span>
-                        </label>
-                        <label class="setting-item">
-                            <input type="checkbox" id="always-on-top" checked>
-                            <span>Always on top</span>
-                        </label>
-                        <label class="setting-item">
-                            <select id="theme-select">
-                                <option value="dark">Dark</option>
-                                <option value="light">Light</option>
-                            </select>
-                            <span>Theme</span>
-                        </label>
-                    </div>
-                    
-                    <div class="setting-group">
-                        <h4>Coaches</h4>
-                        <label class="setting-item">
-                            <input type="checkbox" id="economy-coach" checked>
-                            <span>Economy Coach</span>
-                        </label>
-                        <label class="setting-item">
-                            <input type="checkbox" id="composition-coach" checked>
-                            <span>Composition Coach</span>
-                        </label>
-                        <label class="setting-item">
-                            <input type="checkbox" id="positioning-coach" checked>
-                            <span>Positioning Coach</span>
-                        </label>
-                        <label class="setting-item">
-                            <input type="checkbox" id="item-coach" checked>
-                            <span>Item Coach</span>
-                        </label>
-                    </div>
+                        this.websocket.onmessage = (event) => {
+                            try {
+                                const data = JSON.parse(event.data);
+                                this.handleUpdate(data);
+                            } catch (error) {
+                                console.error('Error parsing message:', error);
+                            }
+                        };
 
-                    <div class="setting-group">
-                        <h4>Suggestions</h4>
-                        <label class="setting-item">
-                            <input type="range" id="max-suggestions" min="1" max="10" value="5">
-                            <span>Max suggestions: <span id="max-suggestions-value">5</span></span>
-                        </label>
-                        <label class="setting-item">
-                            <input type="range" id="suggestion-priority" min="1" max="10" value="5">
-                            <span>Min priority: <span id="suggestion-priority-value">5</span></span>
-                        </label>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="save-settings" class="btn btn-primary">Save</button>
-                    <button id="cancel-settings" class="btn btn-secondary">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </div>
+                        this.websocket.onclose = () => {
+                            console.log('Disconnected from TFT overlay backend');
+                            this.isConnected = false;
+                            this.updateConnectionStatus();
 
-    <!-- Loading indicator -->
-    <div id="loading-indicator" class="loading-indicator">
-        <div class="spinner"></div>
-        <p>Connecting to TFT AI Coach...</p>
-    </div>
+                            // Attempt to reconnect
+                            setTimeout(() => this.connect(), this.reconnectInterval);
+                        };
 
-    <!-- Scripts -->
-    <script src="../scripts/websocket_client.js"></script>
-    <script src="../scripts/ui_manager.js"></script>
-    <script src="../scripts/event_handler.js"></script>
-    <script src="../scripts/main.js"></script>
-</body>
+                        this.websocket.onerror = (error) => {
+                            console.error('WebSocket error:', error);
+                        };
+
+                    } catch (error) {
+                        console.error('Failed to connect:', error);
+                        setTimeout(() => this.connect(), this.reconnectInterval);
+                    }
+                }
+
+                updateConnectionStatus() {
+                    if (this.isConnected) {
+                        this.elements.connectionStatus.classList.add('connected');
+                    } else {
+                        this.elements.connectionStatus.classList.remove('connected');
+                    }
+                }
+
+                handleUpdate(data) {
+                    if (data.type === 'update') {
+                        this.updateStats(data.stats);
+                        this.updateEconomy(data.economy);
+                        this.updateSuggestions(data.suggestions);
+                    }
+                }
+
+                updateStats(stats) {
+                    // Update gold with confidence indicator
+                    if (stats.gold !== null) {
+                        const confidence = stats.confidence?.gold || 0;
+                        this.elements.goldValue.innerHTML = `${stats.gold}${this.getConfidenceIndicator(confidence)}`;
+                    }
+
+                    // Update health with confidence indicator
+                    if (stats.health !== null) {
+                        const confidence = stats.confidence?.health || 0;
+                        this.elements.healthValue.innerHTML = `${stats.health}${this.getConfidenceIndicator(confidence)}`;
+                    }
+
+                    // Update level
+                    if (stats.level !== null) {
+                        this.elements.levelValue.textContent = stats.level;
+                    }
+
+                    // Update stage/round
+                    if (stats.stage !== null && stats.round !== null) {
+                        this.elements.stageValue.textContent = `${stats.stage}-${stats.round}`;
+                    } else if (stats.stage !== null) {
+                        this.elements.stageValue.textContent = stats.stage;
+                    }
+                }
+
+                updateEconomy(economy) {
+                    // Update economy strength
+                    const strengthText = this.formatEconomyStrength(economy.economy_strength);
+                    this.elements.economyStrength.textContent = strengthText;
+
+                    // Update economy status styling
+                    this.elements.economyStatus.className = 'economy-status';
+                    if (economy.economy_strength === 'weak') {
+                        this.elements.economyStatus.classList.add('weak');
+                    } else if (economy.economy_strength === 'very_weak') {
+                        this.elements.economyStatus.classList.add('very-weak');
+                    }
+
+                    // Update interest
+                    this.elements.interestValue.textContent = economy.interest || 0;
+
+                    // Update next breakpoint
+                    this.elements.nextBreakpoint.textContent = economy.next_interest_breakpoint || '--';
+                }
+
+                updateSuggestions(suggestions) {
+                    const container = this.elements.suggestionsContainer;
+
+                    if (!suggestions || suggestions.length === 0) {
+                        container.innerHTML = '<div class="no-data">No suggestions at this time</div>';
+                        return;
+                    }
+
+                    // Sort suggestions by priority (higher first)
+                    suggestions.sort((a, b) => b.priority - a.priority);
+
+                    container.innerHTML = '';
+
+                    suggestions.forEach(suggestion => {
+                        const div = document.createElement('div');
+                        div.className = `suggestion ${this.getPriorityClass(suggestion.priority)} ${suggestion.category}`;
+                        div.textContent = suggestion.message;
+                        container.appendChild(div);
+                    });
+                }
+
+                formatEconomyStrength(strength) {
+                    const strengthMap = {
+                        'very_strong': 'Very Strong',
+                        'strong': 'Strong',
+                        'average': 'Average',
+                        'weak': 'Weak',
+                        'very_weak': 'Very Weak'
+                    };
+                    return strengthMap[strength] || strength;
+                }
+
+                getPriorityClass(priority) {
+                    if (priority >= 9) return 'priority-high';
+                    if (priority >= 7) return 'priority-medium';
+                    return 'priority-low';
+                }
+
+                getConfidenceIndicator(confidence) {
+                    if (confidence < 0.5) {
+                        return '<span class="confidence-indicator">(?)</span>';
+                    } else if (confidence < 0.8) {
+                        return '<span class="confidence-indicator">(~)</span>';
+                    }
+                    return '';
+                }
+            }
+
+            // Initialize overlay when page loads
+            document.addEventListener('DOMContentLoaded', () => {
+                new TFTOverlay();
+            });
+        </script>
+    </body>
 </html>

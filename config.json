@@ -1,51 +1,61 @@
 {
-    "capture": {
-        "fps": 30,
-        "regions": {
-            "board": {"x": 100, "y": 200, "w": 800, "h": 600},
-            "shop": {"x": 200, "y": 850, "w": 600, "h": 150},
-            "gold": {"x": 50, "y": 950, "w": 100, "h": 50},
-            "health": {"x": 50, "y": 900, "w": 100, "h": 50},
-            "level": {"x": 50, "y": 850, "w": 100, "h": 50},
-            "traits": {"x": 50, "y": 200, "w": 150, "h": 600}
-        },
-        "monitor": 0,
-        "enable_debug": false
-    },
-    "ai": {
-        "confidence_threshold": 0.8,
-        "max_suggestions": 5,
-        "update_interval": 0.5,
-        "enable_ml_models": true,
-        "model_path": "data/models/",
-        "coaches": {
-            "economy": {"enabled": true, "weight": 1.0},
-            "composition": {"enabled": true, "weight": 1.0},
-            "positioning": {"enabled": true, "weight": 0.8},
-            "items": {"enabled": true, "weight": 0.9}
-        }
-    },
-    "overlay": {
-        "port": 8765,
-        "transparent": true,
-        "always_on_top": true,
-        "position": {"x": 0, "y": 0},
-        "size": {"width": 1920, "height": 1080},
-        "theme": "dark",
-        "opacity": 0.9
-    },
-    "vision": {
-        "ocr_engine": "tesseract",
-        "template_threshold": 0.8,
-        "preprocessing": {
-            "enable_denoising": true,
-            "enable_sharpening": true
-        }
-    },
-    "logging": {
-        "level": "INFO",
-        "file": "logs/tactibird.log",
-        "max_size": "10MB",
-        "backup_count": 5
+  "capture": {
+    "fps": 2,
+    "monitor": 0
+  },
+  "detection": {
+    "confidence_threshold": 0.7,
+    "auto_detect_regions": true,
+    "ocr_engine": "tesseract",
+    "preprocessing": {
+      "enable_denoising": true,
+      "enable_sharpening": true,
+      "scale_factor": 3
     }
+  },
+  "overlay": {
+    "port": 8765,
+    "update_interval": 1.0,
+    "always_on_top": true,
+    "transparent_background": true
+  },
+  "economy": {
+    "suggestion_cooldown": 5.0,
+    "interest_breakpoints": [10, 20, 30, 40, 50],
+    "safe_health_threshold": 40,
+    "critical_health_threshold": 20,
+    "emergency_health_threshold": 10
+  },
+  "regions": {
+    "gold": {
+      "x_percent": 0.02,
+      "y_percent": 0.88,
+      "w_percent": 0.12,
+      "h_percent": 0.06
+    },
+    "health": {
+      "x_percent": 0.02,
+      "y_percent": 0.82,
+      "w_percent": 0.12,
+      "h_percent": 0.06
+    },
+    "level": {
+      "x_percent": 0.02,
+      "y_percent": 0.76,
+      "w_percent": 0.12,
+      "h_percent": 0.06
+    },
+    "stage_round": {
+      "x_percent": 0.45,
+      "y_percent": 0.02,
+      "w_percent": 0.10,
+      "h_percent": 0.06
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/economy_overlay.log",
+    "max_size": "10MB",
+    "backup_count": 3
+  }
 }

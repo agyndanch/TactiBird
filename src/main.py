@@ -1,47 +1,69 @@
-#!/usr/bin/env python3
 """
-TactiBird Overlay - Main Application Entry Point
+TFT Economy Overlay - Main Entry Point
 """
 
-import sys
 import asyncio
+import argparse
 import logging
+import sys
 from pathlib import Path
 
-# Add both src and parent directory to path to work from anywhere
-current_dir = Path(__file__).parent
-root_dir = current_dir.parent
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-# Add src directory to path
-sys.path.insert(0, str(current_dir))
-# Add root directory to path (in case config.json is there)
-sys.path.insert(0, str(root_dir))
+from src.app import TFTEconomyOverlay
 
-from app import TFTCoachingApp
-from logger import setup_logger
-from config import load_config
+def setup_logging():
+    """Setup logging configuration"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('logs/economy_overlay.log')
+        ]
+    )
 
-def main():
-    """Main application entry point"""
-    # Setup logging
-    logger = setup_logger()
-    logger.info("Starting TactiBird Overlay")
+async def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(description='TFT Economy Overlay')
+    parser.add_argument('--config', default='config.json', help='Configuration file path')
+    parser.add_argument('--calibrate', action='store_true', help='Run region calibration')
+    parser.add_argument('--test-ocr', action='store_true', help='Test OCR detection')
+    
+    args = parser.parse_args()
+    
+    setup_logging()
+    logger = logging.getLogger(__name__)
+    
+    if args.calibrate:
+        logger.info("Starting region calibration...")
+        # TODO: Implement calibration mode
+        print("Calibration mode not yet implemented")
+        return
+    
+    if args.test_ocr:
+        logger.info("Testing OCR detection...")
+        # TODO: Implement OCR test mode
+        print("OCR test mode not yet implemented")
+        return
+    
+    # Start the main overlay application
+    logger.info("Starting TFT Economy Overlay...")
+    overlay = TFTEconomyOverlay(args.config)
     
     try:
-        # Load configuration
-        config = load_config()
-        
-        # Create and run the application
-        app = TFTCoachingApp(config)
-        asyncio.run(app.run())
-        
+        await overlay.start()
     except KeyboardInterrupt:
-        logger.info("Application interrupted by user")
+        logger.info("Received interrupt signal")
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
-        sys.exit(1)
+        logger.error(f"Application error: {e}")
     finally:
-        logger.info("TactiBird Overlay stopped")
+        await overlay.stop()
 
 if __name__ == "__main__":
-    main()
+    # Ensure logs directory exists
+    Path("logs").mkdir(exist_ok=True)
+    
+    # Run the application
+    asyncio.run(main())

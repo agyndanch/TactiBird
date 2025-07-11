@@ -1,229 +1,336 @@
 """
-TFT Economy Overlay - Economy Coach (Simplified)
+TactiBird - Economy Coach Module
 """
 
 import logging
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+import asyncio
 
 logger = logging.getLogger(__name__)
 
 @dataclass
 class EconomySuggestion:
-    """Simple economy suggestion"""
+    """Economy coaching suggestion"""
+    type: str  # 'level', 'reroll', 'save', 'interest'
+    priority: int  # 1-5, 5 being highest
     message: str
-    priority: int  # 1-10, higher is more urgent
-    timestamp: datetime
-    category: str  # interest, leveling, spending, emergency
+    reasoning: str
+    gold_cost: int = 0
+    confidence: float = 0.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'type': self.type,
+            'priority': self.priority,
+            'message': self.message,
+            'reasoning': self.reasoning,
+            'gold_cost': self.gold_cost,
+            'confidence': self.confidence
+        }
 
 class EconomyCoach:
-    """Simplified economy management coach focused on gold/health decisions"""
+    """AI coach for TFT economy management"""
     
-    def __init__(self):
-        self.name = "Economy Coach"
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.confidence_threshold = config.get('confidence_threshold', 0.8)
+        self.max_suggestions = config.get('max_suggestions', 5)
         
-        # Economy rules and thresholds
+        # Economy thresholds
         self.interest_breakpoints = [10, 20, 30, 40, 50]
-        self.safe_health_threshold = 40
-        self.critical_health_threshold = 20
-        self.emergency_health_threshold = 10
+        self.level_costs = {2: 2, 3: 6, 4: 10, 5: 20, 6: 36, 7: 56, 8: 80, 9: 110}
         
-    def get_suggestions(self, gold: int, health: int, level: int, stage: int, round_num: int) -> List[EconomySuggestion]:
-        """Generate economy suggestions based on current game state"""
-        suggestions = []
+        # Stage-specific economy guidelines
+        self.economy_guidelines = self._init_economy_guidelines()
         
+        logger.info("Economy coach initialized")
+    
+    def _init_economy_guidelines(self) -> Dict[str, Dict[str, Any]]:
+        """Initialize stage-specific economy guidelines"""
+        return {
+            "early": {  # Stage 1-2
+                "target_gold": 20,
+                "level_priority": "low",
+                "reroll_threshold": 30,
+                "interest_priority": "high"
+            },
+            "mid": {  # Stage 3-4
+                "target_gold": 30,
+                "level_priority": "medium", 
+                "reroll_threshold": 20,
+                "interest_priority": "medium"
+            },
+            "late": {  # Stage 5+
+                "target_gold": 40,
+                "level_priority": "high",
+                "reroll_threshold": 10,
+                "interest_priority": "low"
+            }
+        }
+    
+    async def get_suggestions(self, game_state) -> List[Dict[str, Any]]:
+        """Get economy coaching suggestions based on game state"""
         try:
-            # Emergency spending (very low health)
-            if health <= self.emergency_health_threshold:
-                suggestions.append(EconomySuggestion(
-                    message=f"EMERGENCY: {health} HP! Spend all {gold} gold to survive!",
-                    priority=10,
-                    timestamp=datetime.now(),
-                    category="emergency"
-                ))
-                return suggestions  # Return only emergency advice
+            suggestions = []
             
-            # Critical health - prioritize strength over economy
-            elif health <= self.critical_health_threshold:
-                suggestions.append(EconomySuggestion(
-                    message=f"Low health ({health} HP) - prioritize board strength over economy",
-                    priority=9,
-                    timestamp=datetime.now(),
-                    category="emergency"
-                ))
+            if not game_state.stats or not game_state.stats.in_game:
+                return suggestions
             
-            # Interest optimization
-            suggestions.extend(self._check_interest_optimization(gold, health))
+            stats = game_state.stats
             
-            # Leveling advice
-            suggestions.extend(self._check_leveling_advice(gold, health, level, stage, round_num))
+            # Determine game phase
+            phase = self._get_game_phase(stats.stage, stats.round_num)
+            guidelines = self.economy_guidelines.get(phase, self.economy_guidelines["mid"])
             
-            # Stage-specific economy advice
-            suggestions.extend(self._check_stage_economy(gold, health, level, stage, round_num))
+            # Generate suggestions based on current state
+            await self._check_interest_optimization(stats, guidelines, suggestions)
+            await self._check_leveling_opportunity(stats, guidelines, suggestions)
+            await self._check_reroll_timing(stats, guidelines, suggestions, game_state)
+            await self._check_economy_health(stats, guidelines, suggestions)
+            await self._check_all_in_timing(stats, guidelines, suggestions, game_state)
+            
+            # Sort by priority and return top suggestions
+            suggestions.sort(key=lambda x: x['priority'], reverse=True)
+            return suggestions[:self.max_suggestions]
             
         except Exception as e:
             logger.error(f"Error generating economy suggestions: {e}")
-        
-        return suggestions
+            return []
     
-    def _check_interest_optimization(self, gold: int, health: int) -> List[EconomySuggestion]:
+    async def _check_interest_optimization(self, stats, guidelines: Dict[str, Any], 
+                                         suggestions: List[Dict[str, Any]]):
         """Check for interest optimization opportunities"""
-        suggestions = []
-        
-        # Don't optimize interest if health is critical
-        if health <= self.critical_health_threshold:
-            return suggestions
-        
-        # Find next interest breakpoint
-        next_breakpoint = None
-        for breakpoint in self.interest_breakpoints:
-            if gold < breakpoint:
-                next_breakpoint = breakpoint
-                break
-        
-        if next_breakpoint:
-            difference = next_breakpoint - gold
+        try:
+            current_gold = stats.gold
             
-            if difference <= 3 and gold >= 7:  # Close to breakpoint
-                suggestions.append(EconomySuggestion(
-                    message=f"Save {difference} more gold to reach {next_breakpoint} (next interest breakpoint)",
-                    priority=6,
-                    timestamp=datetime.now(),
-                    category="interest"
-                ))
-            elif gold >= 50:  # Max interest
-                suggestions.append(EconomySuggestion(
-                    message="At max interest (50g) - consider spending excess gold",
+            # Find next interest breakpoint
+            next_breakpoint = None
+            for breakpoint in self.interest_breakpoints:
+                if current_gold < breakpoint:
+                    next_breakpoint = breakpoint
+                    break
+            
+            if next_breakpoint:
+                gold_needed = next_breakpoint - current_gold
+                
+                # If close to breakpoint, suggest saving
+                if 1 <= gold_needed <= 5 and guidelines["interest_priority"] != "low":
+                    suggestion = EconomySuggestion(
+                        type="interest",
+                        priority=4,
+                        message=f"Save {gold_needed} gold to reach {next_breakpoint}g interest breakpoint",
+                        reasoning=f"Interest income increases from {current_gold // 10} to {next_breakpoint // 10} gold per round",
+                        gold_cost=-gold_needed,  # Negative because it's saving
+                        confidence=0.9
+                    )
+                    suggestions.append(suggestion.to_dict())
+            
+            # Warn about gold overflow
+            if current_gold > 50:
+                suggestion = EconomySuggestion(
+                    type="save",
                     priority=5,
-                    timestamp=datetime.now(),
-                    category="interest"
-                ))
-        
-        return suggestions
+                    message="Consider spending gold - maximum interest reached",
+                    reasoning="You're at max interest (5g/round). Extra gold provides no benefit.",
+                    confidence=1.0
+                )
+                suggestions.append(suggestion.to_dict())
+                
+        except Exception as e:
+            logger.debug(f"Error checking interest optimization: {e}")
     
-    def _check_leveling_advice(self, gold: int, health: int, level: int, stage: int, round_num: int) -> List[EconomySuggestion]:
-        """Provide leveling timing advice"""
-        suggestions = []
-        
-        # Early game leveling (Stage 2)
-        if stage == 2:
-            if round_num == 5 and level < 5 and gold >= 8:  # 2-5 level to 5
-                suggestions.append(EconomySuggestion(
-                    message="Standard timing: Level to 5 at 2-5 for better economy",
-                    priority=7,
-                    timestamp=datetime.now(),
-                    category="leveling"
-                ))
-        
-        # Mid game leveling (Stage 3-4)
-        elif stage in [3, 4]:
-            if level < 6 and gold >= 20 and health > self.safe_health_threshold:
-                suggestions.append(EconomySuggestion(
-                    message="Good economy - consider leveling to 6 for 4-cost champion access",
-                    priority=6,
-                    timestamp=datetime.now(),
-                    category="leveling"
-                ))
-            elif level < 7 and gold >= 28 and stage == 4:
-                suggestions.append(EconomySuggestion(
-                    message="Stage 4 - consider pushing to level 7 if stabilized",
-                    priority=7,
-                    timestamp=datetime.now(),
-                    category="leveling"
-                ))
-        
-        # Late game leveling (Stage 5+)
-        elif stage >= 5:
-            if level < 8 and gold >= 30:
-                suggestions.append(EconomySuggestion(
-                    message="Late game - prioritize leveling to 8 for 5-cost champions",
-                    priority=9,
-                    timestamp=datetime.now(),
-                    category="leveling"
-                ))
-        
-        return suggestions
+    async def _check_leveling_opportunity(self, stats, guidelines: Dict[str, Any], 
+                                        suggestions: List[Dict[str, Any]]):
+        """Check if leveling up is advisable"""
+        try:
+            current_level = stats.level
+            current_gold = stats.gold
+            
+            if current_level >= 9:  # Max level
+                return
+            
+            level_cost = self.level_costs.get(current_level + 1, 999)
+            
+            # Check if we can afford to level
+            if current_gold >= level_cost:
+                priority = self._calculate_level_priority(stats, guidelines)
+                
+                if priority > 2:  # Only suggest if reasonably important
+                    suggestion = EconomySuggestion(
+                        type="level",
+                        priority=priority,
+                        message=f"Level to {current_level + 1} ({level_cost}g)",
+                        reasoning=self._get_level_reasoning(stats, guidelines),
+                        gold_cost=level_cost,
+                        confidence=0.8
+                    )
+                    suggestions.append(suggestion.to_dict())
+                    
+        except Exception as e:
+            logger.debug(f"Error checking leveling opportunity: {e}")
     
-    def _check_stage_economy(self, gold: int, health: int, level: int, stage: int, round_num: int) -> List[EconomySuggestion]:
-        """Stage-specific economy advice"""
-        suggestions = []
-        
-        # Early game (Stage 1-2)
-        if stage <= 2:
-            if gold < 10 and health > 80:
-                suggestions.append(EconomySuggestion(
-                    message="Early game - focus on building economy, avoid excessive spending",
+    async def _check_reroll_timing(self, stats, guidelines: Dict[str, Any], 
+                                 suggestions: List[Dict[str, Any]], game_state):
+        """Check if rerolling is advisable"""
+        try:
+            current_gold = stats.gold
+            
+            # Don't suggest rerolls if we can't afford them
+            if current_gold < 2:
+                return
+            
+            # Check if we should be rerolling based on comp strength
+            if hasattr(game_state, 'board_state') and game_state.board_state:
+                comp_strength = self._evaluate_comp_strength(game_state.board_state)
+                
+                if comp_strength < 0.6:  # Weak composition
+                    if current_gold >= guidelines["reroll_threshold"]:
+                        suggestion = EconomySuggestion(
+                            type="reroll",
+                            priority=3,
+                            message="Consider rerolling for stronger units",
+                            reasoning="Current board composition is weak. Rerolling may improve your chances.",
+                            gold_cost=2,
+                            confidence=0.7
+                        )
+                        suggestions.append(suggestion.to_dict())
+                        
+        except Exception as e:
+            logger.debug(f"Error checking reroll timing: {e}")
+    
+    async def _check_economy_health(self, stats, guidelines: Dict[str, Any], 
+                                  suggestions: List[Dict[str, Any]]):
+        """Check overall economy health and provide warnings"""
+        try:
+            current_gold = stats.gold
+            current_health = stats.health
+            
+            # Low gold warning
+            if current_gold < 10 and stats.stage >= 3:
+                suggestion = EconomySuggestion(
+                    type="save",
+                    priority=4,
+                    message="Economy is low - prioritize saving",
+                    reasoning="Low gold reduces your options. Focus on economy unless health is critical.",
+                    confidence=0.8
+                )
+                suggestions.append(suggestion.to_dict())
+            
+            # Health vs economy balance
+            if current_health <= 20:
+                suggestion = EconomySuggestion(
+                    type="reroll",
                     priority=5,
-                    timestamp=datetime.now(),
-                    category="spending"
-                ))
-        
-        # Krugs (Stage 3-1)
-        elif stage == 3 and round_num == 1:
-            if gold >= 30:
-                suggestions.append(EconomySuggestion(
-                    message="Pre-Krugs: Good economy. Consider small upgrades for PvE round",
-                    priority=6,
-                    timestamp=datetime.now(),
-                    category="spending"
-                ))
-        
-        # Power spike timing (Stage 3-2, first PvP after Krugs)
-        elif stage == 3 and round_num == 2:
-            if level >= 6 and gold >= 20:
-                suggestions.append(EconomySuggestion(
-                    message="Post-Krugs power spike: Good time to roll for 3-cost upgrades at level 6",
-                    priority=7,
-                    timestamp=datetime.now(),
-                    category="spending"
-                ))
-        
-        return suggestions
+                    message="Low health - prioritize board strength over economy",
+                    reasoning="Health is critical. Consider spending gold to stabilize your board.",
+                    confidence=0.9
+                )
+                suggestions.append(suggestion.to_dict())
+                
+        except Exception as e:
+            logger.debug(f"Error checking economy health: {e}")
     
-    def get_economy_status(self, gold: int, health: int, level: int, stage: int) -> Dict[str, Any]:
-        """Get overall economy status summary"""
-        # Calculate interest
-        interest = min(gold // 10, 5)
-        
-        # Determine economy strength
+    async def _check_all_in_timing(self, stats, guidelines: Dict[str, Any], 
+                                 suggestions: List[Dict[str, Any]], game_state):
+        """Check if it's time to go all-in"""
+        try:
+            current_health = stats.health
+            current_stage = stats.stage
+            current_round = stats.round_num
+            
+            # Stage 6+ with low health = all-in time
+            if current_stage >= 6 and current_health <= 30:
+                suggestion = EconomySuggestion(
+                    type="reroll",
+                    priority=5,
+                    message="All-in time - spend gold to maximize board strength",
+                    reasoning="Late game with low health. Economy is less important than survival.",
+                    confidence=0.95
+                )
+                suggestions.append(suggestion.to_dict())
+            
+            # Final stages
+            elif current_stage >= 7:
+                suggestion = EconomySuggestion(
+                    type="reroll",
+                    priority=4,
+                    message="Late game - prioritize board strength",
+                    reasoning="Game is ending soon. Focus on maximizing your current board.",
+                    confidence=0.9
+                )
+                suggestions.append(suggestion.to_dict())
+                
+        except Exception as e:
+            logger.debug(f"Error checking all-in timing: {e}")
+    
+    def _get_game_phase(self, stage: int, round_num: int) -> str:
+        """Determine current game phase"""
         if stage <= 2:
-            # Early game benchmarks
-            target_gold = stage * 15  # Rough benchmark
-            economy_strength = "strong" if gold >= target_gold else "average" if gold >= target_gold * 0.7 else "weak"
+            return "early"
+        elif stage <= 4:
+            return "mid"
         else:
-            # Mid/late game - more complex
-            if gold >= 50:
-                economy_strength = "very_strong"
-            elif gold >= 30:
-                economy_strength = "strong"
-            elif gold >= 20:
-                economy_strength = "average"
-            else:
-                economy_strength = "weak"
-        
-        # Determine spending priority
-        if health <= self.emergency_health_threshold:
-            spending_priority = "emergency_all"
-        elif health <= self.critical_health_threshold:
-            spending_priority = "strength_focus"
-        elif gold >= 50:
-            spending_priority = "can_spend"
-        else:
-            spending_priority = "save_for_interest"
-        
-        return {
-            "gold": gold,
-            "health": health,
-            "interest": interest,
-            "economy_strength": economy_strength,
-            "spending_priority": spending_priority,
-            "next_interest_breakpoint": self._get_next_interest_breakpoint(gold)
-        }
+            return "late"
     
-    def _get_next_interest_breakpoint(self, gold: int) -> Optional[int]:
-        """Get the next interest breakpoint"""
-        for breakpoint in self.interest_breakpoints:
-            if gold < breakpoint:
-                return breakpoint
-        return None
+    def _calculate_level_priority(self, stats, guidelines: Dict[str, Any]) -> int:
+        """Calculate priority for leveling up"""
+        priority = 1
+        
+        # Base priority from guidelines
+        level_priority = guidelines.get("level_priority", "medium")
+        if level_priority == "high":
+            priority += 2
+        elif level_priority == "medium":
+            priority += 1
+        
+        # Adjust based on current level and stage
+        if stats.level < stats.stage + 1:  # Behind on levels
+            priority += 1
+        
+        # Adjust based on health
+        if stats.health <= 30:
+            priority += 1
+        
+        return min(priority, 5)
+    
+    def _get_level_reasoning(self, stats, guidelines: Dict[str, Any]) -> str:
+        """Get reasoning for level suggestion"""
+        reasons = []
+        
+        if stats.level < stats.stage + 1:
+            reasons.append("behind on levels for current stage")
+        
+        if guidelines.get("level_priority") == "high":
+            reasons.append("high priority phase for leveling")
+        
+        if stats.health <= 30:
+            reasons.append("low health requires stronger board")
+        
+        if not reasons:
+            reasons.append("good opportunity to gain board strength")
+        
+        return "Level up: " + ", ".join(reasons)
+    
+    def _evaluate_comp_strength(self, board_state) -> float:
+        """Evaluate current composition strength (0.0 - 1.0)"""
+        try:
+            # This is a simplified evaluation
+            # In a real implementation, this would analyze synergies, unit tiers, etc.
+            
+            if not hasattr(board_state, 'champions') or not board_state.champions:
+                return 0.0
+            
+            # Count units and estimate strength
+            unit_count = len(board_state.champions)
+            
+            # Base strength on unit count
+            strength = min(unit_count / 8, 1.0)  # Full board = 8 units
+            
+            # TODO: Add synergy analysis, unit tier analysis, etc.
+            
+            return strength
+            
+        except Exception as e:
+            logger.debug(f"Error evaluating comp strength: {e}")
+            return 0.5  # Default to medium strength

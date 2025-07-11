@@ -1,177 +1,51 @@
 """
-TactiBird Overlay - File Utilities
+TactiBird - File Utilities Module
 """
 
 import os
-import json
-import csv
-import pickle
-import logging
 import shutil
-import hashlib
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-import zipfile
 import tempfile
-from datetime import datetime
+import logging
+from pathlib import Path
+from typing import Union, List, Optional, Dict, Any
+import json
+import pickle
+import time
 
 logger = logging.getLogger(__name__)
 
 class FileUtils:
-    """Utility functions for file operations"""
+    """Utility class for file operations"""
     
     @staticmethod
-    def ensure_directory(path: Union[str, Path]) -> bool:
-        """Ensure directory exists, create if necessary"""
+    def ensure_directory(directory: Union[str, Path]) -> bool:
+        """Ensure directory exists, create if it doesn't"""
         try:
-            Path(path).mkdir(parents=True, exist_ok=True)
+            Path(directory).mkdir(parents=True, exist_ok=True)
             return True
         except Exception as e:
-            logger.error(f"Failed to create directory {path}: {e}")
+            logger.error(f"Failed to create directory {directory}: {e}")
             return False
     
     @staticmethod
-    def safe_read_json(file_path: Union[str, Path], default: Any = None) -> Any:
-        """Safely read JSON file with fallback"""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            logger.warning(f"JSON file not found: {file_path}")
-            return default
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in {file_path}: {e}")
-            return default
-        except Exception as e:
-            logger.error(f"Failed to read JSON {file_path}: {e}")
-            return default
+    def file_exists(file_path: Union[str, Path]) -> bool:
+        """Check if file exists"""
+        return Path(file_path).exists()
     
     @staticmethod
-    def safe_write_json(file_path: Union[str, Path], data: Any, indent: int = 2, 
-                       backup: bool = True) -> bool:
-        """Safely write JSON file with backup"""
-        try:
-            file_path = Path(file_path)
-            
-            # Create backup if file exists and backup is requested
-            if backup and file_path.exists():
-                backup_path = file_path.with_suffix(f"{file_path.suffix}.backup")
-                shutil.copy2(file_path, backup_path)
-            
-            # Ensure parent directory exists
-            FileUtils.ensure_directory(file_path.parent)
-            
-            # Write to temporary file first
-            temp_path = file_path.with_suffix(f"{file_path.suffix}.tmp")
-            
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=indent, ensure_ascii=False)
-            
-            # Atomic move
-            temp_path.replace(file_path)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to write JSON {file_path}: {e}")
-            return False
-    
-    @staticmethod
-    def safe_read_csv(file_path: Union[str, Path], encoding: str = 'utf-8') -> List[Dict[str, str]]:
-        """Safely read CSV file"""
-        try:
-            data = []
-            with open(file_path, 'r', encoding=encoding, newline='') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    data.append(row)
-            return data
-        except Exception as e:
-            logger.error(f"Failed to read CSV {file_path}: {e}")
-            return []
-    
-    @staticmethod
-    def safe_write_csv(file_path: Union[str, Path], data: List[Dict[str, Any]], 
-                      fieldnames: Optional[List[str]] = None) -> bool:
-        """Safely write CSV file"""
-        try:
-            if not data:
-                return True
-            
-            file_path = Path(file_path)
-            FileUtils.ensure_directory(file_path.parent)
-            
-            if fieldnames is None:
-                fieldnames = list(data[0].keys())
-            
-            with open(file_path, 'w', encoding='utf-8', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(data)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to write CSV {file_path}: {e}")
-            return False
-    
-    @staticmethod
-    def safe_read_pickle(file_path: Union[str, Path], default: Any = None) -> Any:
-        """Safely read pickle file"""
-        try:
-            with open(file_path, 'rb') as f:
-                return pickle.load(f)
-        except Exception as e:
-            logger.error(f"Failed to read pickle {file_path}: {e}")
-            return default
-    
-    @staticmethod
-    def safe_write_pickle(file_path: Union[str, Path], data: Any) -> bool:
-        """Safely write pickle file"""
-        try:
-            file_path = Path(file_path)
-            FileUtils.ensure_directory(file_path.parent)
-            
-            with open(file_path, 'wb') as f:
-                pickle.dump(data, f)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to write pickle {file_path}: {e}")
-            return False
-    
-    @staticmethod
-    def get_file_hash(file_path: Union[str, Path], algorithm: str = 'md5') -> Optional[str]:
-        """Calculate file hash"""
-        try:
-            hash_func = hashlib.new(algorithm)
-            
-            with open(file_path, 'rb') as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hash_func.update(chunk)
-            
-            return hash_func.hexdigest()
-            
-        except Exception as e:
-            logger.error(f"Failed to calculate hash for {file_path}: {e}")
-            return None
-    
-    @staticmethod
-    def get_file_size(file_path: Union[str, Path]) -> int:
+    def get_file_size(file_path: Union[str, Path]) -> Optional[int]:
         """Get file size in bytes"""
         try:
             return Path(file_path).stat().st_size
         except Exception as e:
             logger.error(f"Failed to get size for {file_path}: {e}")
-            return 0
+            return None
     
     @staticmethod
-    def get_file_modified_time(file_path: Union[str, Path]) -> Optional[datetime]:
-        """Get file modification time"""
+    def get_file_modification_time(file_path: Union[str, Path]) -> Optional[float]:
+        """Get file modification time as timestamp"""
         try:
-            timestamp = Path(file_path).stat().st_mtime
-            return datetime.fromtimestamp(timestamp)
+            return Path(file_path).stat().st_mtime
         except Exception as e:
             logger.error(f"Failed to get modification time for {file_path}: {e}")
             return None
@@ -236,31 +110,116 @@ class FileUtils:
             return []
     
     @staticmethod
-    def clean_directory(directory: Union[str, Path], pattern: str = "*", 
-                       max_age_days: Optional[int] = None) -> int:
-        """Clean directory by removing old files"""
+    def read_text_file(file_path: Union[str, Path], encoding: str = 'utf-8') -> Optional[str]:
+        """Read text file content"""
+        try:
+            with open(file_path, 'r', encoding=encoding) as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"Failed to read text file {file_path}: {e}")
+            return None
+    
+    @staticmethod
+    def write_text_file(file_path: Union[str, Path], content: str, 
+                       encoding: str = 'utf-8') -> bool:
+        """Write text content to file"""
+        try:
+            file_path = Path(file_path)
+            FileUtils.ensure_directory(file_path.parent)
+            
+            with open(file_path, 'w', encoding=encoding) as f:
+                f.write(content)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to write text file {file_path}: {e}")
+            return False
+    
+    @staticmethod
+    def read_json_file(file_path: Union[str, Path]) -> Optional[Dict[str, Any]]:
+        """Read JSON file"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to read JSON file {file_path}: {e}")
+            return None
+    
+    @staticmethod
+    def write_json_file(file_path: Union[str, Path], data: Dict[str, Any], 
+                       indent: int = 2) -> bool:
+        """Write data to JSON file"""
+        try:
+            file_path = Path(file_path)
+            FileUtils.ensure_directory(file_path.parent)
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=indent, ensure_ascii=False)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to write JSON file {file_path}: {e}")
+            return False
+    
+    @staticmethod
+    def read_pickle_file(file_path: Union[str, Path]) -> Optional[Any]:
+        """Read pickle file"""
+        try:
+            with open(file_path, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            logger.error(f"Failed to read pickle file {file_path}: {e}")
+            return None
+    
+    @staticmethod
+    def write_pickle_file(file_path: Union[str, Path], data: Any) -> bool:
+        """Write data to pickle file"""
+        try:
+            file_path = Path(file_path)
+            FileUtils.ensure_directory(file_path.parent)
+            
+            with open(file_path, 'wb') as f:
+                pickle.dump(data, f)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to write pickle file {file_path}: {e}")
+            return False
+    
+    @staticmethod
+    def get_directory_size(directory: Union[str, Path]) -> int:
+        """Get total size of directory in bytes"""
+        try:
+            total_size = 0
+            for dirpath, dirnames, filenames in os.walk(directory):
+                for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    try:
+                        total_size += os.path.getsize(filepath)
+                    except (OSError, FileNotFoundError):
+                        continue
+            return total_size
+        except Exception as e:
+            logger.error(f"Failed to get directory size for {directory}: {e}")
+            return 0
+    
+    @staticmethod
+    def clean_directory(directory: Union[str, Path], max_age_days: int = 7) -> int:
+        """Clean old files from directory"""
         try:
             directory = Path(directory)
-            
             if not directory.exists():
                 return 0
             
-            files = list(directory.glob(pattern))
+            current_time = time.time()
+            cutoff_time = current_time - (max_age_days * 24 * 60 * 60)
             deleted_count = 0
             
-            for file_path in files:
+            for file_path in directory.iterdir():
                 if file_path.is_file():
-                    should_delete = True
-                    
-                    if max_age_days is not None:
-                        mod_time = FileUtils.get_file_modified_time(file_path)
-                        if mod_time:
-                            age = (datetime.now() - mod_time).days
-                            should_delete = age > max_age_days
-                    
-                    if should_delete:
-                        if FileUtils.delete_file(file_path):
+                    try:
+                        if file_path.stat().st_mtime < cutoff_time:
+                            file_path.unlink()
                             deleted_count += 1
+                    except Exception as e:
+                        logger.debug(f"Failed to delete old file {file_path}: {e}")
             
             return deleted_count
             
@@ -269,349 +228,108 @@ class FileUtils:
             return 0
     
     @staticmethod
-    def archive_directory(directory: Union[str, Path], archive_path: Union[str, Path], 
-                         compression: str = 'zip') -> bool:
-        """Create archive from directory"""
+    def backup_file(file_path: Union[str, Path], backup_dir: Union[str, Path] = None) -> Optional[Path]:
+        """Create backup of file with timestamp"""
         try:
+            file_path = Path(file_path)
+            if not file_path.exists():
+                return None
+            
+            if backup_dir is None:
+                backup_dir = file_path.parent / "backups"
+            
+            backup_dir = Path(backup_dir)
+            FileUtils.ensure_directory(backup_dir)
+            
+            # Create timestamped backup filename
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_name = f"{file_path.stem}_{timestamp}{file_path.suffix}"
+            backup_path = backup_dir / backup_name
+            
+            if FileUtils.copy_file(file_path, backup_path):
+                return backup_path
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to backup file {file_path}: {e}")
+            return None
+    
+    @staticmethod
+    def compress_directory(directory: Union[str, Path], output_path: Union[str, Path] = None) -> Optional[Path]:
+        """Compress directory to zip file"""
+        try:
+            import zipfile
+            
             directory = Path(directory)
-            archive_path = Path(archive_path)
+            if not directory.exists():
+                return None
             
-            FileUtils.ensure_directory(archive_path.parent)
+            if output_path is None:
+                output_path = directory.parent / f"{directory.name}.zip"
             
-            if compression == 'zip':
-                with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    for file_path in directory.rglob('*'):
-                        if file_path.is_file():
-                            arcname = file_path.relative_to(directory)
-                            zipf.write(file_path, arcname)
-            else:
-                # Use shutil for other formats
-                shutil.make_archive(str(archive_path.with_suffix('')), compression, directory)
+            output_path = Path(output_path)
+            FileUtils.ensure_directory(output_path.parent)
             
-            return True
+            with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in directory.rglob('*'):
+                    if file_path.is_file():
+                        arcname = file_path.relative_to(directory)
+                        zipf.write(file_path, arcname)
+            
+            return output_path
             
         except Exception as e:
-            logger.error(f"Failed to archive {directory}: {e}")
-            return False
+            logger.error(f"Failed to compress directory {directory}: {e}")
+            return None
     
     @staticmethod
-    def extract_archive(archive_path: Union[str, Path], extract_to: Union[str, Path]) -> bool:
-        """Extract archive to directory"""
+    def extract_zip(zip_path: Union[str, Path], extract_to: Union[str, Path] = None) -> bool:
+        """Extract zip file"""
         try:
-            archive_path = Path(archive_path)
-            extract_to = Path(extract_to)
+            import zipfile
             
-            FileUtils.ensure_directory(extract_to)
-            
-            if archive_path.suffix == '.zip':
-                with zipfile.ZipFile(archive_path, 'r') as zipf:
-                    zipf.extractall(extract_to)
-            else:
-                shutil.unpack_archive(archive_path, extract_to)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to extract {archive_path}: {e}")
-            return False
-
-class ConfigManager:
-    """Configuration file manager"""
-    
-    def __init__(self, config_file: Union[str, Path]):
-        self.config_file = Path(config_file)
-        self.config_data = {}
-        self.load_config()
-    
-    def load_config(self) -> bool:
-        """Load configuration from file"""
-        try:
-            self.config_data = FileUtils.safe_read_json(self.config_file, {})
-            return True
-        except Exception as e:
-            logger.error(f"Failed to load config: {e}")
-            return False
-    
-    def save_config(self) -> bool:
-        """Save configuration to file"""
-        try:
-            return FileUtils.safe_write_json(self.config_file, self.config_data)
-        except Exception as e:
-            logger.error(f"Failed to save config: {e}")
-            return False
-    
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get configuration value"""
-        try:
-            keys = key.split('.')
-            value = self.config_data
-            
-            for k in keys:
-                if isinstance(value, dict) and k in value:
-                    value = value[k]
-                else:
-                    return default
-            
-            return value
-        except Exception:
-            return default
-    
-    def set(self, key: str, value: Any) -> bool:
-        """Set configuration value"""
-        try:
-            keys = key.split('.')
-            data = self.config_data
-            
-            # Navigate to parent
-            for k in keys[:-1]:
-                if k not in data:
-                    data[k] = {}
-                data = data[k]
-            
-            # Set value
-            data[keys[-1]] = value
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to set config {key}: {e}")
-            return False
-    
-    def update(self, updates: Dict[str, Any]) -> bool:
-        """Update multiple configuration values"""
-        try:
-            for key, value in updates.items():
-                self.set(key, value)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to update config: {e}")
-            return False
-    
-    def has(self, key: str) -> bool:
-        """Check if configuration key exists"""
-        return self.get(key) is not None
-    
-    def remove(self, key: str) -> bool:
-        """Remove configuration key"""
-        try:
-            keys = key.split('.')
-            data = self.config_data
-            
-            # Navigate to parent
-            for k in keys[:-1]:
-                if k not in data:
-                    return False
-                data = data[k]
-            
-            # Remove key
-            if keys[-1] in data:
-                del data[keys[-1]]
-                return True
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"Failed to remove config {key}: {e}")
-            return False
-    
-    def reset_to_defaults(self, defaults: Dict[str, Any]) -> bool:
-        """Reset configuration to defaults"""
-        try:
-            self.config_data = defaults.copy()
-            return self.save_config()
-        except Exception as e:
-            logger.error(f"Failed to reset config: {e}")
-            return False
-    
-    def backup_config(self, backup_path: Optional[Union[str, Path]] = None) -> bool:
-        """Create backup of current configuration"""
-        try:
-            if backup_path is None:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_path = self.config_file.with_suffix(f".backup_{timestamp}.json")
-            
-            return FileUtils.copy_file(self.config_file, backup_path)
-            
-        except Exception as e:
-            logger.error(f"Failed to backup config: {e}")
-            return False
-    
-    def restore_config(self, backup_path: Union[str, Path]) -> bool:
-        """Restore configuration from backup"""
-        try:
-            if FileUtils.copy_file(backup_path, self.config_file):
-                return self.load_config()
-            return False
-            
-        except Exception as e:
-            logger.error(f"Failed to restore config: {e}")
-            return False
-
-class DataExporter:
-    """Export data to various formats"""
-    
-    @staticmethod
-    def export_to_json(data: Any, output_path: Union[str, Path], 
-                      pretty: bool = True) -> bool:
-        """Export data to JSON format"""
-        try:
-            indent = 2 if pretty else None
-            return FileUtils.safe_write_json(output_path, data, indent=indent)
-        except Exception as e:
-            logger.error(f"JSON export failed: {e}")
-            return False
-    
-    @staticmethod
-    def export_to_csv(data: List[Dict[str, Any]], output_path: Union[str, Path],
-                     fieldnames: Optional[List[str]] = None) -> bool:
-        """Export data to CSV format"""
-        try:
-            return FileUtils.safe_write_csv(output_path, data, fieldnames)
-        except Exception as e:
-            logger.error(f"CSV export failed: {e}")
-            return False
-    
-    @staticmethod
-    def export_game_session(session_data: Dict[str, Any], 
-                           output_dir: Union[str, Path]) -> bool:
-        """Export complete game session data"""
-        try:
-            output_dir = Path(output_dir)
-            FileUtils.ensure_directory(output_dir)
-            
-            # Export main session data
-            session_file = output_dir / "session.json"
-            if not DataExporter.export_to_json(session_data, session_file):
+            zip_path = Path(zip_path)
+            if not zip_path.exists():
                 return False
             
-            # Export game states if available
-            if 'game_states' in session_data:
-                states_file = output_dir / "game_states.json"
-                DataExporter.export_to_json(session_data['game_states'], states_file)
+            if extract_to is None:
+                extract_to = zip_path.parent / zip_path.stem
             
-            # Export suggestions if available
-            if 'suggestions' in session_data:
-                suggestions_file = output_dir / "suggestions.csv"
-                suggestions_data = []
-                
-                for suggestion in session_data['suggestions']:
-                    suggestions_data.append({
-                        'timestamp': suggestion.get('timestamp', ''),
-                        'type': suggestion.get('type', ''),
-                        'message': suggestion.get('message', ''),
-                        'priority': suggestion.get('priority', 0),
-                        'context': str(suggestion.get('context', {}))
-                    })
-                
-                DataExporter.export_to_csv(suggestions_data, suggestions_file)
+            extract_to = Path(extract_to)
+            FileUtils.ensure_directory(extract_to)
             
-            # Create summary
-            summary = {
-                'export_timestamp': datetime.now().isoformat(),
-                'session_duration': session_data.get('duration', 0),
-                'total_suggestions': len(session_data.get('suggestions', [])),
-                'game_states_count': len(session_data.get('game_states', [])),
-                'files_exported': ['session.json']
-            }
-            
-            if 'game_states' in session_data:
-                summary['files_exported'].append('game_states.json')
-            if 'suggestions' in session_data:
-                summary['files_exported'].append('suggestions.csv')
-            
-            summary_file = output_dir / "export_summary.json"
-            DataExporter.export_to_json(summary, summary_file)
+            with zipfile.ZipFile(zip_path, 'r') as zipf:
+                zipf.extractall(extract_to)
             
             return True
             
         except Exception as e:
-            logger.error(f"Game session export failed: {e}")
-            return False
-
-class LogManager:
-    """Log file management utilities"""
-    
-    @staticmethod
-    def rotate_logs(log_file: Union[str, Path], max_size_mb: int = 10, 
-                   backup_count: int = 5) -> bool:
-        """Rotate log files when they get too large"""
-        try:
-            log_file = Path(log_file)
-            
-            if not log_file.exists():
-                return True
-            
-            # Check file size
-            size_mb = FileUtils.get_file_size(log_file) / (1024 * 1024)
-            
-            if size_mb > max_size_mb:
-                # Rotate existing backups
-                for i in range(backup_count - 1, 0, -1):
-                    old_backup = log_file.with_suffix(f"{log_file.suffix}.{i}")
-                    new_backup = log_file.with_suffix(f"{log_file.suffix}.{i + 1}")
-                    
-                    if old_backup.exists():
-                        if new_backup.exists():
-                            FileUtils.delete_file(new_backup)
-                        FileUtils.move_file(old_backup, new_backup)
-                
-                # Move current log to .1
-                backup_file = log_file.with_suffix(f"{log_file.suffix}.1")
-                if backup_file.exists():
-                    FileUtils.delete_file(backup_file)
-                
-                FileUtils.move_file(log_file, backup_file)
-                
-                # Create new empty log file
-                log_file.touch()
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Log rotation failed: {e}")
-            return False
-    
-    @staticmethod
-    def clean_old_logs(log_directory: Union[str, Path], 
-                      max_age_days: int = 30) -> int:
-        """Clean old log files"""
-        try:
-            return FileUtils.clean_directory(log_directory, "*.log*", max_age_days)
-        except Exception as e:
-            logger.error(f"Log cleanup failed: {e}")
-            return 0
-    
-    @staticmethod
-    def archive_logs(log_directory: Union[str, Path], 
-                    archive_path: Union[str, Path]) -> bool:
-        """Archive log files"""
-        try:
-            return FileUtils.archive_directory(log_directory, archive_path)
-        except Exception as e:
-            logger.error(f"Log archiving failed: {e}")
+            logger.error(f"Failed to extract zip {zip_path}: {e}")
             return False
 
 class TempFileManager:
-    """Temporary file management"""
+    """Manager for temporary files and directories"""
     
     def __init__(self, cleanup_on_exit: bool = True):
+        self.cleanup_on_exit = cleanup_on_exit
         self.temp_files = []
         self.temp_dirs = []
-        self.cleanup_on_exit = cleanup_on_exit
     
     def create_temp_file(self, suffix: str = '', prefix: str = 'tactibird_', 
-                        delete: bool = False) -> Path:
+                        content: str = None) -> Path:
         """Create temporary file"""
         try:
-            temp_file = tempfile.NamedTemporaryFile(
-                suffix=suffix, prefix=prefix, delete=delete
-            )
+            fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix=prefix)
+            temp_path = Path(temp_path)
             
-            temp_path = Path(temp_file.name)
+            if content is not None:
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            else:
+                os.close(fd)  # Close file descriptor if no content
             
-            if not delete:
-                temp_file.close()
-                self.temp_files.append(temp_path)
-            
+            self.temp_files.append(temp_path)
             return temp_path
             
         except Exception as e:
@@ -651,6 +369,129 @@ class TempFileManager:
         """Destructor - cleanup if enabled"""
         if self.cleanup_on_exit:
             self.cleanup()
+
+class ConfigManager:
+    """Manager for configuration files with automatic backup and validation"""
+    
+    def __init__(self, config_path: Union[str, Path], backup_count: int = 5):
+        self.config_path = Path(config_path)
+        self.backup_count = backup_count
+        self.backup_dir = self.config_path.parent / "config_backups"
+    
+    def load_config(self) -> Optional[Dict[str, Any]]:
+        """Load configuration with automatic backup"""
+        try:
+            if not self.config_path.exists():
+                return None
+            
+            # Create backup before loading
+            self._create_backup()
+            
+            return FileUtils.read_json_file(self.config_path)
+            
+        except Exception as e:
+            logger.error(f"Failed to load config: {e}")
+            return self._restore_from_backup()
+    
+    def save_config(self, config: Dict[str, Any]) -> bool:
+        """Save configuration with validation"""
+        try:
+            # Validate config before saving
+            if not self._validate_config(config):
+                return False
+            
+            # Create backup of current config
+            if self.config_path.exists():
+                self._create_backup()
+            
+            # Save new config
+            success = FileUtils.write_json_file(self.config_path, config)
+            
+            if success:
+                # Clean old backups
+                self._cleanup_old_backups()
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Failed to save config: {e}")
+            return False
+    
+    def _create_backup(self) -> bool:
+        """Create timestamped backup of current config"""
+        try:
+            if not self.config_path.exists():
+                return True
+            
+            FileUtils.ensure_directory(self.backup_dir)
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_name = f"config_{timestamp}.json"
+            backup_path = self.backup_dir / backup_name
+            
+            return FileUtils.copy_file(self.config_path, backup_path)
+            
+        except Exception as e:
+            logger.error(f"Failed to create config backup: {e}")
+            return False
+    
+    def _restore_from_backup(self) -> Optional[Dict[str, Any]]:
+        """Restore config from most recent backup"""
+        try:
+            if not self.backup_dir.exists():
+                return None
+            
+            # Find most recent backup
+            backups = list(self.backup_dir.glob("config_*.json"))
+            if not backups:
+                return None
+            
+            latest_backup = max(backups, key=lambda p: p.stat().st_mtime)
+            config = FileUtils.read_json_file(latest_backup)
+            
+            if config and self._validate_config(config):
+                logger.info(f"Restored config from backup: {latest_backup}")
+                return config
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to restore from backup: {e}")
+            return None
+    
+    def _validate_config(self, config: Dict[str, Any]) -> bool:
+        """Validate configuration structure"""
+        try:
+            # Basic validation - ensure required sections exist
+            required_sections = ['capture', 'ai', 'overlay', 'vision']
+            
+            for section in required_sections:
+                if section not in config:
+                    logger.error(f"Missing required config section: {section}")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Config validation error: {e}")
+            return False
+    
+    def _cleanup_old_backups(self):
+        """Remove old backup files, keeping only the most recent ones"""
+        try:
+            if not self.backup_dir.exists():
+                return
+            
+            backups = list(self.backup_dir.glob("config_*.json"))
+            if len(backups) <= self.backup_count:
+                return
+            
+            # Sort by modification time and remove oldest
+            backups.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            for old_backup in backups[self.backup_count:]:
+                FileUtils.delete_file(old_backup)
+            
+        except Exception as e:
+            logger.error(f"Failed to cleanup old backups: {e}")
 
 # Global temp file manager instance
 temp_manager = TempFileManager()

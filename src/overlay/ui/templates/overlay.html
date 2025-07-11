@@ -1,528 +1,482 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>TFT Economy Overlay</title>
-        <link rel="stylesheet" href="../styles/overlay.css">
-        <link rel="stylesheet" href="../styles/themes/dark.css">
-    </head>
-    <body>
-        <div class="overlay-container" id="overlayContainer">
-            <!-- Header -->
-            <div class="header">
-                <div class="status-indicator">
-                    <div class="status-dot connected" id="statusDot"></div>
-                    <span class="status-text" id="statusText">TactiBird</span>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TactiBird Overlay</title>
+    <link rel="stylesheet" href="../styles/overlay.css">
+</head>
+<body>
+    <div class="overlay-container" id="overlayContainer">
+        <div class="overlay-header" id="overlayHeader">
+            <div class="header-left">
+                <div class="app-logo">
+                    <span class="logo-icon">🐦</span>
+                    <span class="app-name">TactiBird</span>
                 </div>
-                <div class="controls">
-                    <button class="control-btn minimize" id="minimizeBtn">−</button>
-                    <button class="control-btn close" id="closeBtn">×</button>
-                </div>
-            </div>
-
-            <!-- Main Content -->
-            <div class="main-content" id="mainContent">
-                <!-- Game State Panel -->
-                <div class="game-state-panel">
-                    <div class="stat-group">
-                        <div class="stat-item">
-                            <div class="stat-label">Gold</div>
-                            <div class="stat-value gold-value" id="goldValue">--</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Health</div>
-                            <div class="stat-value health-value" id="healthValue">--</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Level</div>
-                            <div class="stat-value level-value" id="levelValue">--</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Stage</div>
-                            <div class="stat-value" id="stageValue">--</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Economy Status -->
-                <div class="economy-status" id="economyStatus">
-                    <div class="economy-label">Economy: 
-                        <span class="economy-strength" id="economyStrength">Unknown</span>
-                    </div>
-                </div>
-
-                <!-- Suggestions Panel -->
-                <div class="suggestions-panel">
-                    <div class="panel-header">
-                        <h4>Suggestions</h4>
-                        <span class="suggestion-count" id="suggestionCount">0</span>
-                    </div>
-                    <div class="suggestions-list" id="suggestionsList">
-                        <div class="no-suggestions">
-                            Waiting for game data...
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Playstyle Selection Panel -->
-                <div class="playstyle-panel">
-                    <div class="panel-header">
-                        <h4>Playstyle</h4>
-                    </div>
-                    <div class="playstyle-selector">
-                        <select id="playstyleSelect" class="playstyle-dropdown">
-                            <option value="">Select playstyle...</option>
-                            <option value="1-cost-reroll">1-Cost Reroll</option>
-                            <option value="2-cost-reroll">2-Cost Reroll</option>
-                            <option value="3-cost-reroll">3-Cost Reroll</option>
-                            <option value="fast-8">Fast 8</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Economy Panel -->
-                <div class="economy-panel">
-                    <h4>Economy Details</h4>
-                    <div class="economy-info" id="economyInfo">
-                        <div class="economy-item">
-                            <span class="label">Interest:</span>
-                            <span class="value" id="interestValue">--</span>
-                        </div>
-                        <div class="economy-item">
-                            <span class="label">Streak:</span>
-                            <span class="value" id="streakValue">--</span>
-                        </div>
-                    </div>
+                <div class="connection-status" id="connectionStatus">
+                    <div class="status-indicator" id="statusIndicator"></div>
+                    <span class="status-text" id="statusText">Connecting...</span>
                 </div>
             </div>
-
-            <!-- Loading Indicator -->
-            <div class="loading-indicator" id="loadingIndicator" style="display: none;">
-                <div class="spinner"></div>
-                <div>Connecting to TactiBird...</div>
+            <div class="header-controls">
+                <button class="control-btn minimize-btn" id="minimizeBtn" title="Minimize">−</button>
+                <button class="control-btn close-btn" id="closeBtn" title="Close">×</button>
             </div>
         </div>
 
-        <script>
-            class OverlayApp {
-                constructor() {
-                    this.websocket = null;
-                    this.reconnectAttempts = 0;
-                    this.maxReconnectAttempts = 5;
-                    this.reconnectDelay = 1000;
-                    this.isMinimized = false;
+        <div class="overlay-content" id="overlayContent">
+            <!-- Player Stats Panel -->
+            <div class="stats-panel">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Gold</span>
+                        <span class="stat-value" id="goldValue">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Health</span>
+                        <span class="stat-value" id="healthValue">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Level</span>
+                        <span class="stat-value" id="levelValue">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Stage</span>
+                        <span class="stat-value" id="stageValue">--</span>
+                    </div>
+                </div>
+                <div class="economy-status" id="economyStatus">
+                    <span class="status-label">Economy:</span>
+                    <span class="economy-strength" id="economyStrength">Unknown</span>
+                </div>
+            </div>
 
-                    this.elements = {
-                        container: document.getElementById('overlayContainer'),
-                        statusDot: document.getElementById('statusDot'),
-                        statusText: document.getElementById('statusText'),
-                        goldValue: document.getElementById('goldValue'),
-                        healthValue: document.getElementById('healthValue'),
-                        levelValue: document.getElementById('levelValue'),
-                        stageValue: document.getElementById('stageValue'),
-                        economyStrength: document.getElementById('economyStrength'),
-                        economyStatus: document.getElementById('economyStatus'),
-                        suggestionsList: document.getElementById('suggestionsList'),
-                        suggestionCount: document.getElementById('suggestionCount'),
-                        minimizeBtn: document.getElementById('minimizeBtn'),
-                        closeBtn: document.getElementById('closeBtn'),
-                        loadingIndicator: document.getElementById('loadingIndicator'),
-                        mainContent: document.getElementById('mainContent'),
-                        interestValue: document.getElementById('interestValue'),
-                        streakValue: document.getElementById('streakValue'),
-                        playstyleSelect: document.getElementById('playstyleSelect')
+            <!-- Playstyle Selection Panel -->
+            <div class="playstyle-panel">
+                <div class="panel-header">
+                    <h4>Playstyle</h4>
+                </div>
+                <div class="playstyle-selector">
+                    <select id="playstyleSelect" class="playstyle-dropdown">
+                        <option value="">Select playstyle...</option>
+                        <option value="1-cost-reroll">1-Cost Reroll</option>
+                        <option value="2-cost-reroll">2-Cost Reroll</option>
+                        <option value="3-cost-reroll">3-Cost Reroll</option>
+                        <option value="fast-8">Fast 8</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Suggestions Panel -->
+            <div class="suggestions-panel">
+                <div class="panel-header">
+                    <h4>Suggestions</h4>
+                    <span class="suggestion-count" id="suggestionCount">0</span>
+                </div>
+                <div class="suggestions-list" id="suggestionsList">
+                    <div class="no-suggestions">
+                        Waiting for game data...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Economy Panel -->
+            <div class="economy-panel">
+                <h4>Economy Details</h4>
+                <div class="economy-info" id="economyInfo">
+                    <div class="economy-item">
+                        <span class="label">Interest:</span>
+                        <span class="value" id="interestValue">--</span>
+                    </div>
+                    <div class="economy-item">
+                        <span class="label">Streak:</span>
+                        <span class="value" id="streakValue">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+            <div class="spinner"></div>
+            <span>Loading...</span>
+        </div>
+    </div>
+
+    <script>
+        class OverlayApp {
+            constructor() {
+                this.websocket = null;
+                this.isMinimized = false;
+                this.selectedPlaystyle = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                this.reconnectDelay = 2000;
+
+                this.initializeElements();
+                this.setupEventListeners();
+                this.connect();
+            }
+
+            initializeElements() {
+                this.elements = {
+                    container: document.getElementById('overlayContainer'),
+                    statusIndicator: document.getElementById('statusIndicator'),
+                    statusText: document.getElementById('statusText'),
+                    minimizeBtn: document.getElementById('minimizeBtn'),
+                    closeBtn: document.getElementById('closeBtn'),
+                    goldValue: document.getElementById('goldValue'),
+                    healthValue: document.getElementById('healthValue'),
+                    levelValue: document.getElementById('levelValue'),
+                    stageValue: document.getElementById('stageValue'),
+                    economyStatus: document.getElementById('economyStatus'),
+                    economyStrength: document.getElementById('economyStrength'),
+                    suggestionsList: document.getElementById('suggestionsList'),
+                    suggestionCount: document.getElementById('suggestionCount'),
+                    playstyleSelect: document.getElementById('playstyleSelect'),
+                    interestValue: document.getElementById('interestValue'),
+                    streakValue: document.getElementById('streakValue'),
+                    loadingIndicator: document.getElementById('loadingIndicator')
+                };
+            }
+
+            setupEventListeners() {
+                this.elements.minimizeBtn.addEventListener('click', () => this.toggleMinimize());
+                this.elements.closeBtn.addEventListener('click', () => this.closeOverlay());
+                this.elements.playstyleSelect.addEventListener('change', (e) => this.onPlaystyleChange(e.target.value));
+            }
+
+            connect() {
+                try {
+                    this.websocket = new WebSocket('ws://localhost:8765');
+                    
+                    this.websocket.onopen = () => {
+                        console.log('Connected to TactiBird backend');
+                        this.updateConnectionStatus(true);
+                        this.reconnectAttempts = 0;
                     };
 
-                    this.initializeEventListeners();
-                    this.connectWebSocket();
-                }
-
-                initializeEventListeners() {
-                    this.elements.minimizeBtn.addEventListener('click', () => this.toggleMinimize());
-                    this.elements.closeBtn.addEventListener('click', () => this.closeOverlay());
-                    this.elements.playstyleSelect.addEventListener('change', (e) => this.onPlaystyleChange(e.target.value));
-                    
-                    // Make the overlay draggable
-                    this.makeDraggable();
-                }
-
-                makeDraggable() {
-                    let isDragging = false;
-                    let currentX;
-                    let currentY;
-                    let initialX;
-                    let initialY;
-                    let xOffset = 0;
-                    let yOffset = 0;
-
-                    const header = document.querySelector('.header');
-                    
-                    header.addEventListener('mousedown', (e) => {
-                        if (e.target.closest('.controls')) return;
-                        
-                        isDragging = true;
-                        initialX = e.clientX - xOffset;
-                        initialY = e.clientY - yOffset;
-                    });
-
-                    document.addEventListener('mousemove', (e) => {
-                        if (isDragging) {
-                            e.preventDefault();
-                            currentX = e.clientX - initialX;
-                            currentY = e.clientY - initialY;
-                            
-                            xOffset = currentX;
-                            yOffset = currentY;
-                            
-                            this.elements.container.style.transform = `translate(${currentX}px, ${currentY}px)`;
-                        }
-                    });
-
-                    document.addEventListener('mouseup', () => {
-                        isDragging = false;
-                    });
-                }
-
-                connectWebSocket() {
-                    try {
-                        this.websocket = new WebSocket('ws://localhost:8765');
-                        this.elements.loadingIndicator.style.display = 'block';
-
-                        this.websocket.onopen = () => {
-                            console.log('WebSocket connected');
-                            this.onConnectionOpen();
-                        };
-
-                        this.websocket.onmessage = (event) => {
+                    this.websocket.onmessage = (event) => {
+                        try {
                             const data = JSON.parse(event.data);
                             this.handleUpdate(data);
-                        };
-
-                        this.websocket.onclose = () => {
-                            console.log('WebSocket disconnected');
-                            this.onConnectionClose();
-                        };
-
-                        this.websocket.onerror = (error) => {
-                            console.error('WebSocket error:', error);
-                            this.onConnectionError();
-                        };
-
-                    } catch (error) {
-                        console.error('Failed to create WebSocket connection:', error);
-                        this.onConnectionError();
-                    }
-                }
-
-                onConnectionOpen() {
-                    this.reconnectAttempts = 0;
-                    this.elements.loadingIndicator.style.display = 'none';
-                    this.updateConnectionStatus(true);
-                }
-
-                onConnectionClose() {
-                    this.updateConnectionStatus(false);
-                    this.attemptReconnect();
-                }
-
-                onConnectionError() {
-                    this.updateConnectionStatus(false);
-                    this.attemptReconnect();
-                }
-
-                attemptReconnect() {
-                    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                        this.reconnectAttempts++;
-                        this.elements.statusText.textContent = `Reconnecting... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`;
-                        
-                        setTimeout(() => {
-                            this.connectWebSocket();
-                        }, this.reconnectDelay * this.reconnectAttempts);
-                    } else {
-                        this.elements.statusText.textContent = 'Connection Failed';
-                        this.elements.loadingIndicator.style.display = 'none';
-                    }
-                }
-
-                updateConnectionStatus(connected) {
-                    if (connected) {
-                        this.elements.statusDot.className = 'status-dot connected';
-                        this.elements.statusText.textContent = 'TactiBird';
-                        this.elements.container.classList.remove('disconnected');
-                    } else {
-                        this.elements.statusDot.className = 'status-dot disconnected';
-                        this.elements.statusText.textContent = 'Disconnected';
-                        this.elements.container.classList.add('disconnected');
-                    }
-                }
-
-                handleUpdate(data) {
-                    if (data.type === 'update') {
-                        this.updateStats(data.stats);
-                        this.updateEconomy(data.economy);
-                        this.updateSuggestions(data.suggestions);
-                    }
-                }
-
-                onPlaystyleChange(playstyle) {
-                    console.log('Playstyle changed to:', playstyle);
-                    this.selectedPlaystyle = playstyle;
-                    
-                    // Send playstyle to backend if connected
-                    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-                        this.websocket.send(JSON.stringify({
-                            type: 'playstyle_change',
-                            playstyle: playstyle
-                        }));
-                    }
-                    
-                    // Update suggestions immediately based on current game state
-                    this.generatePlaystyleSuggestions();
-                }
-
-                generatePlaystyleSuggestions() {
-                    if (!this.selectedPlaystyle) return;
-                    
-                    const currentGold = parseInt(this.elements.goldValue.textContent) || 0;
-                    const currentLevel = parseInt(this.elements.levelValue.textContent) || 1;
-                    const suggestions = this.getPlaystyleSpecificSuggestions(this.selectedPlaystyle, currentGold, currentLevel);
-                    
-                    if (suggestions.length > 0) {
-                        this.updateSuggestions(suggestions);
-                    }
-                }
-
-                getPlaystyleSpecificSuggestions(playstyle, gold, level) {
-                    const suggestions = [];
-                    
-                    switch (playstyle) {
-                        case '1-cost-reroll':
-                            if (level < 6) {
-                                suggestions.push({
-                                    type: 'Economy',
-                                    priority: 'high',
-                                    message: 'Stay at level 4-5. Don\'t level until you have your 1-cost carry 3-starred.'
-                                });
-                            }
-                            if (gold > 50) {
-                                suggestions.push({
-                                    type: 'Rolling',
-                                    priority: 'high',
-                                    message: 'Start rolling down to find your 1-cost carry. Maintain 50+ gold for interest.'
-                                });
-                            }
-                            if (level >= 6) {
-                                suggestions.push({
-                                    type: 'Strategy',
-                                    priority: 'medium',
-                                    message: 'You\'re too high level for 1-cost reroll. Consider pivoting to a different strategy.'
-                                });
-                            }
-                            break;
-                            
-                        case '2-cost-reroll':
-                            if (level < 5) {
-                                suggestions.push({
-                                    type: 'Economy',
-                                    priority: 'medium',
-                                    message: 'Level to 5 when you have 30+ gold to improve 2-cost odds.'
-                                });
-                            }
-                            if (level === 5 && gold > 30) {
-                                suggestions.push({
-                                    type: 'Rolling',
-                                    priority: 'high',
-                                    message: 'Perfect level for 2-cost reroll! Start rolling for your 2-cost carries.'
-                                });
-                            }
-                            if (level > 6) {
-                                suggestions.push({
-                                    type: 'Strategy',
-                                    priority: 'medium',
-                                    message: 'Consider transitioning to higher cost units or fast 8 strategy.'
-                                });
-                            }
-                            break;
-                            
-                        case '3-cost-reroll':
-                            if (level < 6) {
-                                suggestions.push({
-                                    type: 'Economy',
-                                    priority: 'high',
-                                    message: 'Level to 6 first for better 3-cost odds before rolling.'
-                                });
-                            }
-                            if (level === 6 && gold > 40) {
-                                suggestions.push({
-                                    type: 'Rolling',
-                                    priority: 'high',
-                                    message: 'Great level for 3-cost reroll! Start rolling for your 3-cost carries.'
-                                });
-                            }
-                            if (level >= 7 && gold < 30) {
-                                suggestions.push({
-                                    type: 'Economy',
-                                    priority: 'medium',
-                                    message: 'Build economy before rolling at level 7+ for 3-cost units.'
-                                });
-                            }
-                            break;
-                            
-                        case 'fast-8':
-                            if (level < 7 && gold > 20) {
-                                suggestions.push({
-                                    type: 'Leveling',
-                                    priority: 'high',
-                                    message: 'Keep leveling! Fast 8 requires aggressive leveling with minimal rolling.'
-                                });
-                            }
-                            if (level === 7 && gold > 30) {
-                                suggestions.push({
-                                    type: 'Leveling',
-                                    priority: 'high',
-                                    message: 'Push to level 8! You\'re almost there for 4 and 5-cost access.'
-                                });
-                            }
-                            if (level >= 8) {
-                                suggestions.push({
-                                    type: 'Rolling',
-                                    priority: 'high',
-                                    message: 'You\'re level 8! Start rolling for 4-cost and 5-cost units.'
-                                });
-                            }
-                            if (level < 6 && gold < 20) {
-                                suggestions.push({
-                                    type: 'Economy',
-                                    priority: 'high',
-                                    message: 'Fast 8 needs strong economy. Focus on econ before aggressive leveling.'
-                                });
-                            }
-                            break;
-                    }
-                    
-                    return suggestions;
-                }
-
-                updateStats(stats) {
-                    // Update gold with confidence indicator
-                    if (stats.gold !== null) {
-                        const confidence = stats.confidence?.gold || 0;
-                        this.elements.goldValue.innerHTML = `${stats.gold}${this.getConfidenceIndicator(confidence)}`;
-                    }
-
-                    // Update health with confidence indicator
-                    if (stats.health !== null) {
-                        const confidence = stats.confidence?.health || 0;
-                        this.elements.healthValue.innerHTML = `${stats.health}${this.getConfidenceIndicator(confidence)}`;
-                    }
-
-                    // Update level
-                    if (stats.level !== null) {
-                        this.elements.levelValue.textContent = stats.level;
-                    }
-
-                    // Update stage/round
-                    if (stats.stage !== null && stats.round !== null) {
-                        this.elements.stageValue.textContent = `${stats.stage}-${stats.round}`;
-                    } else if (stats.stage !== null) {
-                        this.elements.stageValue.textContent = stats.stage;
-                    }
-                    
-                    // Generate playstyle suggestions when stats update
-                    if (this.selectedPlaystyle) {
-                        this.generatePlaystyleSuggestions();
-                    }
-                }
-
-                updateEconomy(economy) {
-                    // Update economy strength
-                    const strengthText = this.formatEconomyStrength(economy.economy_strength);
-                    this.elements.economyStrength.textContent = strengthText;
-
-                    // Update economy status styling
-                    this.elements.economyStatus.className = 'economy-status';
-                    if (economy.economy_strength === 'weak') {
-                        this.elements.economyStatus.classList.add('weak');
-                    } else if (economy.economy_strength === 'critical') {
-                        this.elements.economyStatus.classList.add('critical');
-                    }
-
-                    // Update interest and streak
-                    if (economy.interest !== null) {
-                        this.elements.interestValue.textContent = `+${economy.interest}`;
-                    }
-                    
-                    if (economy.streak !== null) {
-                        this.elements.streakValue.textContent = economy.streak;
-                    }
-                }
-
-                updateSuggestions(suggestions) {
-                    if (!suggestions || suggestions.length === 0) {
-                        // If no backend suggestions and no playstyle selected, show default message
-                        if (!this.selectedPlaystyle) {
-                            this.elements.suggestionsList.innerHTML = '<div class="no-suggestions">Select a playstyle above for tailored suggestions</div>';
-                        } else {
-                            this.elements.suggestionsList.innerHTML = '<div class="no-suggestions">No additional suggestions available</div>';
+                        } catch (error) {
+                            console.error('Error parsing message:', error);
                         }
-                        this.elements.suggestionCount.textContent = '0';
-                        return;
-                    }
-
-                    this.elements.suggestionCount.textContent = suggestions.length.toString();
-
-                    const suggestionsHTML = suggestions.map(suggestion => {
-                        const priorityClass = `priority-${suggestion.priority || 'medium'}`;
-                        return `
-                            <div class="suggestion-item ${priorityClass}">
-                                <div class="suggestion-header">
-                                    <span class="suggestion-type">${suggestion.type || 'General'}</span>
-                                    <span class="suggestion-priority">${suggestion.priority || 'Medium'}</span>
-                                </div>
-                                <div class="suggestion-message">${suggestion.message}</div>
-                            </div>
-                        `;
-                    }).join('');
-
-                    this.elements.suggestionsList.innerHTML = suggestionsHTML;
-                }
-
-                formatEconomyStrength(strength) {
-                    const strengthMap = {
-                        'excellent': 'Excellent',
-                        'strong': 'Strong',
-                        'decent': 'Decent',
-                        'weak': 'Weak',
-                        'critical': 'Critical'
                     };
-                    return strengthMap[strength] || 'Unknown';
-                }
 
-                getConfidenceIndicator(confidence) {
-                    if (confidence >= 0.9) return '';
-                    if (confidence >= 0.7) return '<span class="confidence-indicator medium">?</span>';
-                    return '<span class="confidence-indicator low">??</span>';
-                }
+                    this.websocket.onclose = () => {
+                        console.log('Disconnected from TactiBird backend');
+                        this.updateConnectionStatus(false);
+                        this.attemptReconnect();
+                    };
 
-                toggleMinimize() {
-                    this.isMinimized = !this.isMinimized;
-                    this.elements.container.classList.toggle('minimized', this.isMinimized);
-                    this.elements.minimizeBtn.textContent = this.isMinimized ? '+' : '−';
-                }
+                    this.websocket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateConnectionStatus(false);
+                    };
 
-                closeOverlay() {
-                    this.elements.container.classList.add('hidden');
-                    if (this.websocket) {
-                        this.websocket.close();
-                    }
+                } catch (error) {
+                    console.error('Failed to connect:', error);
+                    this.updateConnectionStatus(false);
+                    this.attemptReconnect();
                 }
             }
 
-            // Initialize the overlay when the page loads
-            document.addEventListener('DOMContentLoaded', () => {
-                new OverlayApp();
-            });
-        </script>
-    </body>
+            attemptReconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    this.elements.statusText.textContent = `Reconnecting... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`;
+                    
+                    setTimeout(() => {
+                        this.connect();
+                    }, this.reconnectDelay);
+                } else {
+                    this.elements.statusText.textContent = 'Connection failed';
+                }
+            }
+
+            updateConnectionStatus(connected) {
+                if (connected) {
+                    this.elements.statusIndicator.className = 'status-indicator connected';
+                    this.elements.statusText.textContent = 'Connected';
+                    this.elements.container.classList.remove('disconnected');
+                } else {
+                    this.elements.statusIndicator.className = 'status-indicator disconnected';
+                    this.elements.statusText.textContent = 'Disconnected';
+                    this.elements.container.classList.add('disconnected');
+                }
+            }
+
+            handleUpdate(data) {
+                if (data.type === 'update') {
+                    this.updateStats(data.stats);
+                    this.updateEconomy(data.economy);
+                    this.updateSuggestions(data.suggestions);
+                }
+            }
+
+            onPlaystyleChange(playstyle) {
+                console.log('Playstyle changed to:', playstyle);
+                this.selectedPlaystyle = playstyle;
+                
+                // Send playstyle to backend
+                if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                    this.websocket.send(JSON.stringify({
+                        type: 'playstyle_change',
+                        playstyle: playstyle
+                    }));
+                }
+                
+                // Show loading state while waiting for backend response
+                if (playstyle) {
+                    this.showSuggestionsLoading();
+                } else {
+                    // Clear suggestions if no playstyle selected
+                    this.updateSuggestions([]);
+                }
+            }
+
+            showSuggestionsLoading() {
+                this.elements.suggestionsList.innerHTML = `
+                    <div class="no-suggestions">
+                        <div class="loading-spinner"></div>
+                        Loading playstyle suggestions...
+                    </div>
+                `;
+                this.elements.suggestionCount.textContent = '...';
+            }
+
+            updateSuggestions(suggestions) {
+                if (!suggestions || suggestions.length === 0) {
+                    // Show appropriate message based on playstyle selection
+                    if (!this.selectedPlaystyle) {
+                        this.elements.suggestionsList.innerHTML = '<div class="no-suggestions">Select a playstyle above for tailored suggestions</div>';
+                    } else {
+                        this.elements.suggestionsList.innerHTML = '<div class="no-suggestions">No suggestions available for current game state</div>';
+                    }
+                    this.elements.suggestionCount.textContent = '0';
+                    return;
+                }
+
+                this.elements.suggestionCount.textContent = suggestions.length.toString();
+
+                const suggestionsHTML = suggestions.map(suggestion => {
+                    const priorityClass = this.getPriorityClass(suggestion.priority);
+                    const typeClass = this.getTypeClass(suggestion.type);
+                    
+                    return `
+                        <div class="suggestion-item ${priorityClass} ${typeClass}">
+                            <div class="suggestion-header">
+                                <span class="suggestion-type">${suggestion.type || 'General'}</span>
+                                <span class="suggestion-priority">${this.formatPriority(suggestion.priority)}</span>
+                            </div>
+                            <div class="suggestion-message">${suggestion.message}</div>
+                            ${suggestion.reasoning ? `<div class="suggestion-reasoning">${suggestion.reasoning}</div>` : ''}
+                            ${suggestion.confidence ? `<div class="suggestion-confidence">Confidence: ${Math.round(suggestion.confidence * 100)}%</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+
+                this.elements.suggestionsList.innerHTML = suggestionsHTML;
+            }
+
+            getPriorityClass(priority) {
+                if (priority >= 5) return 'priority-critical';
+                if (priority >= 4) return 'priority-high';
+                if (priority >= 3) return 'priority-medium';
+                if (priority >= 2) return 'priority-low';
+                return 'priority-minimal';
+            }
+
+            getTypeClass(type) {
+                const typeMap = {
+                    'Economy': 'type-economy',
+                    'Rolling': 'type-rolling',
+                    'level': 'type-level',
+                    'reroll': 'type-reroll',
+                    'save': 'type-save',
+                    'interest': 'type-interest'
+                };
+                return typeMap[type] || 'type-general';
+            }
+
+            formatPriority(priority) {
+                if (priority >= 5) return 'Critical';
+                if (priority >= 4) return 'High';
+                if (priority >= 3) return 'Medium';
+                if (priority >= 2) return 'Low';
+                return 'Info';
+            }
+
+            updateStats(stats) {
+                // Update gold with confidence indicator
+                if (stats.gold !== null) {
+                    const confidence = stats.confidence?.gold || 0;
+                    this.elements.goldValue.innerHTML = `${stats.gold}${this.getConfidenceIndicator(confidence)}`;
+                }
+
+                // Update health with confidence indicator
+                if (stats.health !== null) {
+                    const confidence = stats.confidence?.health || 0;
+                    this.elements.healthValue.innerHTML = `${stats.health}${this.getConfidenceIndicator(confidence)}`;
+                }
+
+                // Update level
+                if (stats.level !== null) {
+                    this.elements.levelValue.textContent = stats.level;
+                }
+
+                // Update stage/round
+                if (stats.stage !== null && stats.round !== null) {
+                    this.elements.stageValue.textContent = `${stats.stage}-${stats.round}`;
+                } else if (stats.stage !== null) {
+                    this.elements.stageValue.textContent = stats.stage;
+                }
+            }
+
+            updateEconomy(economy) {
+                // Update economy strength
+                const strengthText = this.formatEconomyStrength(economy.economy_strength);
+                this.elements.economyStrength.textContent = strengthText;
+
+                // Update economy status styling
+                this.elements.economyStatus.className = 'economy-status';
+                if (economy.economy_strength === 'weak') {
+                    this.elements.economyStatus.classList.add('weak');
+                } else if (economy.economy_strength === 'critical') {
+                    this.elements.economyStatus.classList.add('critical');
+                }
+
+                // Update interest and streak
+                if (economy.interest !== null) {
+                    this.elements.interestValue.textContent = `+${economy.interest}`;
+                }
+                
+                if (economy.streak !== null) {
+                    this.elements.streakValue.textContent = economy.streak;
+                }
+            }
+
+            formatEconomyStrength(strength) {
+                const strengthMap = {
+                    'excellent': 'Excellent',
+                    'strong': 'Strong',
+                    'decent': 'Decent',
+                    'weak': 'Weak',
+                    'critical': 'Critical'
+                };
+                return strengthMap[strength] || 'Unknown';
+            }
+
+            getConfidenceIndicator(confidence) {
+                if (confidence >= 0.9) return '';
+                if (confidence >= 0.7) return '<span class="confidence-indicator medium">?</span>';
+                return '<span class="confidence-indicator low">??</span>';
+            }
+
+            toggleMinimize() {
+                this.isMinimized = !this.isMinimized;
+                this.elements.container.classList.toggle('minimized', this.isMinimized);
+                this.elements.minimizeBtn.textContent = this.isMinimized ? '+' : '−';
+            }
+
+            closeOverlay() {
+                this.elements.container.classList.add('hidden');
+                if (this.websocket) {
+                    this.websocket.close();
+                }
+            }
+        }
+
+        // Initialize the overlay when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new OverlayApp();
+        });
+    </script>
+    
+    <style>
+        /* Additional styles for new features */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .suggestion-reasoning {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .suggestion-confidence {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            text-align: right;
+        }
+
+        /* Priority-based styling */
+        .priority-critical {
+            border-left: 3px solid var(--error-color);
+            background: rgba(220, 53, 69, 0.1);
+        }
+
+        .priority-high {
+            border-left: 3px solid var(--warning-color);
+            background: rgba(255, 193, 7, 0.1);
+        }
+
+        .priority-medium {
+            border-left: 3px solid var(--accent-color);
+            background: rgba(66, 153, 225, 0.1);
+        }
+
+        .priority-low {
+            border-left: 3px solid var(--success-color);
+            background: rgba(40, 167, 69, 0.1);
+        }
+
+        .priority-minimal {
+            border-left: 3px solid var(--text-secondary);
+            background: rgba(108, 117, 125, 0.1);
+        }
+
+        /* Type-based icons/styling */
+        .type-economy .suggestion-type::before {
+            content: "💰 ";
+        }
+
+        .type-rolling .suggestion-type::before {
+            content: "🎲 ";
+        }
+
+        .type-level .suggestion-type::before {
+            content: "📈 ";
+        }
+
+        .type-reroll .suggestion-type::before {
+            content: "🔄 ";
+        }
+
+        .type-save .suggestion-type::before {
+            content: "💾 ";
+        }
+
+        .type-interest .suggestion-type::before {
+            content: "💵 ";
+        }
+    </style>
+</body>
 </html>

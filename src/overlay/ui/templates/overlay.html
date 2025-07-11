@@ -4,262 +4,256 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>TFT Economy Overlay</title>
-        <style>
-            body {
-                margin: 0;
-                padding: 10px;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: rgba(0, 0, 0, 0.7);
-                color: white;
-                font-size: 14px;
-                min-width: 300px;
-                border-radius: 8px;
-            }
-
-            .overlay-container {
-                background: linear-gradient(135deg, rgba(30, 30, 30, 0.95), rgba(50, 50, 50, 0.95));
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 8px;
-                padding: 15px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            }
-
-            .header {
-                text-align: center;
-                font-weight: bold;
-                font-size: 16px;
-                margin-bottom: 15px;
-                color: #FFD700;
-                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-            }
-
-            .stats-section {
-                background: rgba(0, 0, 0, 0.3);
-                border-radius: 6px;
-                padding: 10px;
-                margin-bottom: 15px;
-            }
-
-            .stat-row {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 5px;
-            }
-
-            .stat-label {
-                color: #CCCCCC;
-            }
-
-            .stat-value {
-                font-weight: bold;
-            }
-
-            .gold-value {
-                color: #FFD700;
-            }
-
-            .health-value {
-                color: #FF6B6B;
-            }
-
-            .level-value {
-                color: #74C0FC;
-            }
-
-            .economy-status {
-                background: rgba(0, 100, 0, 0.2);
-                border-left: 3px solid #4CAF50;
-                padding: 8px 10px;
-                margin-bottom: 15px;
-                border-radius: 4px;
-            }
-
-            .economy-status.weak {
-                background: rgba(100, 100, 0, 0.2);
-                border-left-color: #FFC107;
-            }
-
-            .economy-status.very-weak {
-                background: rgba(100, 0, 0, 0.2);
-                border-left-color: #F44336;
-            }
-
-            .suggestions-section {
-                margin-top: 15px;
-            }
-
-            .suggestion {
-                background: rgba(30, 30, 30, 0.8);
-                border-left: 3px solid #2196F3;
-                padding: 8px 10px;
-                margin-bottom: 8px;
-                border-radius: 4px;
-                font-size: 13px;
-            }
-
-            .suggestion.priority-high {
-                border-left-color: #FF5722;
-                background: rgba(100, 20, 20, 0.3);
-            }
-
-            .suggestion.priority-medium {
-                border-left-color: #FF9800;
-                background: rgba(100, 50, 0, 0.3);
-            }
-
-            .suggestion.priority-low {
-                border-left-color: #4CAF50;
-            }
-
-            .suggestion.emergency {
-                border-left-color: #F44336;
-                background: rgba(244, 67, 54, 0.2);
-                animation: pulse 1.5s infinite;
-            }
-
-            @keyframes pulse {
-                0% { opacity: 1; }
-                50% { opacity: 0.7; }
-                100% { opacity: 1; }
-            }
-
-            .no-data {
-                text-align: center;
-                color: #888;
-                font-style: italic;
-                padding: 20px;
-            }
-
-            .connection-status {
-                position: absolute;
-                top: 5px;
-                right: 5px;
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
-                background: #F44336;
-            }
-
-            .connection-status.connected {
-                background: #4CAF50;
-            }
-
-            .confidence-indicator {
-                font-size: 11px;
-                color: #888;
-                margin-left: 5px;
-            }
-        </style>
+        <link rel="stylesheet" href="../styles/overlay.css">
+        <link rel="stylesheet" href="../styles/themes/dark.css">
     </head>
     <body>
-        <div class="overlay-container">
-            <div class="connection-status" id="connectionStatus"></div>
-
+        <div class="overlay-container" id="overlayContainer">
+            <!-- Header -->
             <div class="header">
-                TFT Economy Coach
-            </div>
-
-            <div class="stats-section" id="statsSection">
-                <div class="stat-row">
-                    <span class="stat-label">Gold:</span>
-                    <span class="stat-value gold-value" id="goldValue">--</span>
+                <div class="status-indicator">
+                    <div class="status-dot connected" id="statusDot"></div>
+                    <span class="status-text" id="statusText">TactiBird</span>
                 </div>
-                <div class="stat-row">
-                    <span class="stat-label">Health:</span>
-                    <span class="stat-value health-value" id="healthValue">--</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Level:</span>
-                    <span class="stat-value level-value" id="levelValue">--</span>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Stage:</span>
-                    <span class="stat-value" id="stageValue">--</span>
+                <div class="controls">
+                    <button class="control-btn minimize" id="minimizeBtn">−</button>
+                    <button class="control-btn close" id="closeBtn">×</button>
                 </div>
             </div>
 
-            <div class="economy-status" id="economyStatus">
-                Economy: <span id="economyStrength">Unknown</span>
-                <br>
-                Interest: <span id="interestValue">0</span>/5
-                <br>
-                Next breakpoint: <span id="nextBreakpoint">--</span>
+            <!-- Main Content -->
+            <div class="main-content" id="mainContent">
+                <!-- Game State Panel -->
+                <div class="game-state-panel">
+                    <div class="stat-group">
+                        <div class="stat-item">
+                            <div class="stat-label">Gold</div>
+                            <div class="stat-value gold-value" id="goldValue">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Health</div>
+                            <div class="stat-value health-value" id="healthValue">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Level</div>
+                            <div class="stat-value level-value" id="levelValue">--</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Stage</div>
+                            <div class="stat-value" id="stageValue">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Economy Status -->
+                <div class="economy-status" id="economyStatus">
+                    <div class="economy-label">Economy: 
+                        <span class="economy-strength" id="economyStrength">Unknown</span>
+                    </div>
+                </div>
+
+                <!-- Suggestions Panel -->
+                <div class="suggestions-panel">
+                    <div class="panel-header">
+                        <h4>Suggestions</h4>
+                        <span class="suggestion-count" id="suggestionCount">0</span>
+                    </div>
+                    <div class="suggestions-list" id="suggestionsList">
+                        <div class="no-suggestions">
+                            Waiting for game data...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Playstyle Selection Panel -->
+                <div class="playstyle-panel">
+                    <div class="panel-header">
+                        <h4>Playstyle</h4>
+                    </div>
+                    <div class="playstyle-selector">
+                        <select id="playstyleSelect" class="playstyle-dropdown">
+                            <option value="">Select playstyle...</option>
+                            <option value="1-cost-reroll">1-Cost Reroll</option>
+                            <option value="2-cost-reroll">2-Cost Reroll</option>
+                            <option value="3-cost-reroll">3-Cost Reroll</option>
+                            <option value="fast-8">Fast 8</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Economy Panel -->
+                <div class="economy-panel">
+                    <h4>Economy Details</h4>
+                    <div class="economy-info" id="economyInfo">
+                        <div class="economy-item">
+                            <span class="label">Interest:</span>
+                            <span class="value" id="interestValue">--</span>
+                        </div>
+                        <div class="economy-item">
+                            <span class="label">Streak:</span>
+                            <span class="value" id="streakValue">--</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="suggestions-section">
-                <div style="font-weight: bold; margin-bottom: 8px; color: #FFD700;">Suggestions:</div>
-                <div id="suggestionsContainer">
-                    <div class="no-data">Waiting for game data...</div>
-                </div>
+            <!-- Loading Indicator -->
+            <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+                <div class="spinner"></div>
+                <div>Connecting to TactiBird...</div>
             </div>
         </div>
 
         <script>
-            class TFTOverlay {
+            class OverlayApp {
                 constructor() {
                     this.websocket = null;
-                    this.reconnectInterval = 3000; // 3 seconds
-                    this.isConnected = false;
+                    this.reconnectAttempts = 0;
+                    this.maxReconnectAttempts = 5;
+                    this.reconnectDelay = 1000;
+                    this.isMinimized = false;
 
                     this.elements = {
-                        connectionStatus: document.getElementById('connectionStatus'),
+                        container: document.getElementById('overlayContainer'),
+                        statusDot: document.getElementById('statusDot'),
+                        statusText: document.getElementById('statusText'),
                         goldValue: document.getElementById('goldValue'),
                         healthValue: document.getElementById('healthValue'),
                         levelValue: document.getElementById('levelValue'),
                         stageValue: document.getElementById('stageValue'),
-                        economyStatus: document.getElementById('economyStatus'),
                         economyStrength: document.getElementById('economyStrength'),
+                        economyStatus: document.getElementById('economyStatus'),
+                        suggestionsList: document.getElementById('suggestionsList'),
+                        suggestionCount: document.getElementById('suggestionCount'),
+                        minimizeBtn: document.getElementById('minimizeBtn'),
+                        closeBtn: document.getElementById('closeBtn'),
+                        loadingIndicator: document.getElementById('loadingIndicator'),
+                        mainContent: document.getElementById('mainContent'),
                         interestValue: document.getElementById('interestValue'),
-                        nextBreakpoint: document.getElementById('nextBreakpoint'),
-                        suggestionsContainer: document.getElementById('suggestionsContainer')
+                        streakValue: document.getElementById('streakValue'),
+                        playstyleSelect: document.getElementById('playstyleSelect')
                     };
 
-                    this.connect();
+                    this.initializeEventListeners();
+                    this.connectWebSocket();
                 }
 
-                connect() {
+                initializeEventListeners() {
+                    this.elements.minimizeBtn.addEventListener('click', () => this.toggleMinimize());
+                    this.elements.closeBtn.addEventListener('click', () => this.closeOverlay());
+                    this.elements.playstyleSelect.addEventListener('change', (e) => this.onPlaystyleChange(e.target.value));
+                    
+                    // Make the overlay draggable
+                    this.makeDraggable();
+                }
+
+                makeDraggable() {
+                    let isDragging = false;
+                    let currentX;
+                    let currentY;
+                    let initialX;
+                    let initialY;
+                    let xOffset = 0;
+                    let yOffset = 0;
+
+                    const header = document.querySelector('.header');
+                    
+                    header.addEventListener('mousedown', (e) => {
+                        if (e.target.closest('.controls')) return;
+                        
+                        isDragging = true;
+                        initialX = e.clientX - xOffset;
+                        initialY = e.clientY - yOffset;
+                    });
+
+                    document.addEventListener('mousemove', (e) => {
+                        if (isDragging) {
+                            e.preventDefault();
+                            currentX = e.clientX - initialX;
+                            currentY = e.clientY - initialY;
+                            
+                            xOffset = currentX;
+                            yOffset = currentY;
+                            
+                            this.elements.container.style.transform = `translate(${currentX}px, ${currentY}px)`;
+                        }
+                    });
+
+                    document.addEventListener('mouseup', () => {
+                        isDragging = false;
+                    });
+                }
+
+                connectWebSocket() {
                     try {
                         this.websocket = new WebSocket('ws://localhost:8765');
+                        this.elements.loadingIndicator.style.display = 'block';
 
                         this.websocket.onopen = () => {
-                            console.log('Connected to TFT overlay backend');
-                            this.isConnected = true;
-                            this.updateConnectionStatus();
+                            console.log('WebSocket connected');
+                            this.onConnectionOpen();
                         };
 
                         this.websocket.onmessage = (event) => {
-                            try {
-                                const data = JSON.parse(event.data);
-                                this.handleUpdate(data);
-                            } catch (error) {
-                                console.error('Error parsing message:', error);
-                            }
+                            const data = JSON.parse(event.data);
+                            this.handleUpdate(data);
                         };
 
                         this.websocket.onclose = () => {
-                            console.log('Disconnected from TFT overlay backend');
-                            this.isConnected = false;
-                            this.updateConnectionStatus();
-
-                            // Attempt to reconnect
-                            setTimeout(() => this.connect(), this.reconnectInterval);
+                            console.log('WebSocket disconnected');
+                            this.onConnectionClose();
                         };
 
                         this.websocket.onerror = (error) => {
                             console.error('WebSocket error:', error);
+                            this.onConnectionError();
                         };
 
                     } catch (error) {
-                        console.error('Failed to connect:', error);
-                        setTimeout(() => this.connect(), this.reconnectInterval);
+                        console.error('Failed to create WebSocket connection:', error);
+                        this.onConnectionError();
                     }
                 }
 
-                updateConnectionStatus() {
-                    if (this.isConnected) {
-                        this.elements.connectionStatus.classList.add('connected');
+                onConnectionOpen() {
+                    this.reconnectAttempts = 0;
+                    this.elements.loadingIndicator.style.display = 'none';
+                    this.updateConnectionStatus(true);
+                }
+
+                onConnectionClose() {
+                    this.updateConnectionStatus(false);
+                    this.attemptReconnect();
+                }
+
+                onConnectionError() {
+                    this.updateConnectionStatus(false);
+                    this.attemptReconnect();
+                }
+
+                attemptReconnect() {
+                    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                        this.reconnectAttempts++;
+                        this.elements.statusText.textContent = `Reconnecting... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`;
+                        
+                        setTimeout(() => {
+                            this.connectWebSocket();
+                        }, this.reconnectDelay * this.reconnectAttempts);
                     } else {
-                        this.elements.connectionStatus.classList.remove('connected');
+                        this.elements.statusText.textContent = 'Connection Failed';
+                        this.elements.loadingIndicator.style.display = 'none';
+                    }
+                }
+
+                updateConnectionStatus(connected) {
+                    if (connected) {
+                        this.elements.statusDot.className = 'status-dot connected';
+                        this.elements.statusText.textContent = 'TactiBird';
+                        this.elements.container.classList.remove('disconnected');
+                    } else {
+                        this.elements.statusDot.className = 'status-dot disconnected';
+                        this.elements.statusText.textContent = 'Disconnected';
+                        this.elements.container.classList.add('disconnected');
                     }
                 }
 
@@ -269,6 +263,145 @@
                         this.updateEconomy(data.economy);
                         this.updateSuggestions(data.suggestions);
                     }
+                }
+
+                onPlaystyleChange(playstyle) {
+                    console.log('Playstyle changed to:', playstyle);
+                    this.selectedPlaystyle = playstyle;
+                    
+                    // Send playstyle to backend if connected
+                    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                        this.websocket.send(JSON.stringify({
+                            type: 'playstyle_change',
+                            playstyle: playstyle
+                        }));
+                    }
+                    
+                    // Update suggestions immediately based on current game state
+                    this.generatePlaystyleSuggestions();
+                }
+
+                generatePlaystyleSuggestions() {
+                    if (!this.selectedPlaystyle) return;
+                    
+                    const currentGold = parseInt(this.elements.goldValue.textContent) || 0;
+                    const currentLevel = parseInt(this.elements.levelValue.textContent) || 1;
+                    const suggestions = this.getPlaystyleSpecificSuggestions(this.selectedPlaystyle, currentGold, currentLevel);
+                    
+                    if (suggestions.length > 0) {
+                        this.updateSuggestions(suggestions);
+                    }
+                }
+
+                getPlaystyleSpecificSuggestions(playstyle, gold, level) {
+                    const suggestions = [];
+                    
+                    switch (playstyle) {
+                        case '1-cost-reroll':
+                            if (level < 6) {
+                                suggestions.push({
+                                    type: 'Economy',
+                                    priority: 'high',
+                                    message: 'Stay at level 4-5. Don\'t level until you have your 1-cost carry 3-starred.'
+                                });
+                            }
+                            if (gold > 50) {
+                                suggestions.push({
+                                    type: 'Rolling',
+                                    priority: 'high',
+                                    message: 'Start rolling down to find your 1-cost carry. Maintain 50+ gold for interest.'
+                                });
+                            }
+                            if (level >= 6) {
+                                suggestions.push({
+                                    type: 'Strategy',
+                                    priority: 'medium',
+                                    message: 'You\'re too high level for 1-cost reroll. Consider pivoting to a different strategy.'
+                                });
+                            }
+                            break;
+                            
+                        case '2-cost-reroll':
+                            if (level < 5) {
+                                suggestions.push({
+                                    type: 'Economy',
+                                    priority: 'medium',
+                                    message: 'Level to 5 when you have 30+ gold to improve 2-cost odds.'
+                                });
+                            }
+                            if (level === 5 && gold > 30) {
+                                suggestions.push({
+                                    type: 'Rolling',
+                                    priority: 'high',
+                                    message: 'Perfect level for 2-cost reroll! Start rolling for your 2-cost carries.'
+                                });
+                            }
+                            if (level > 6) {
+                                suggestions.push({
+                                    type: 'Strategy',
+                                    priority: 'medium',
+                                    message: 'Consider transitioning to higher cost units or fast 8 strategy.'
+                                });
+                            }
+                            break;
+                            
+                        case '3-cost-reroll':
+                            if (level < 6) {
+                                suggestions.push({
+                                    type: 'Economy',
+                                    priority: 'high',
+                                    message: 'Level to 6 first for better 3-cost odds before rolling.'
+                                });
+                            }
+                            if (level === 6 && gold > 40) {
+                                suggestions.push({
+                                    type: 'Rolling',
+                                    priority: 'high',
+                                    message: 'Great level for 3-cost reroll! Start rolling for your 3-cost carries.'
+                                });
+                            }
+                            if (level >= 7 && gold < 30) {
+                                suggestions.push({
+                                    type: 'Economy',
+                                    priority: 'medium',
+                                    message: 'Build economy before rolling at level 7+ for 3-cost units.'
+                                });
+                            }
+                            break;
+                            
+                        case 'fast-8':
+                            if (level < 7 && gold > 20) {
+                                suggestions.push({
+                                    type: 'Leveling',
+                                    priority: 'high',
+                                    message: 'Keep leveling! Fast 8 requires aggressive leveling with minimal rolling.'
+                                });
+                            }
+                            if (level === 7 && gold > 30) {
+                                suggestions.push({
+                                    type: 'Leveling',
+                                    priority: 'high',
+                                    message: 'Push to level 8! You\'re almost there for 4 and 5-cost access.'
+                                });
+                            }
+                            if (level >= 8) {
+                                suggestions.push({
+                                    type: 'Rolling',
+                                    priority: 'high',
+                                    message: 'You\'re level 8! Start rolling for 4-cost and 5-cost units.'
+                                });
+                            }
+                            if (level < 6 && gold < 20) {
+                                suggestions.push({
+                                    type: 'Economy',
+                                    priority: 'high',
+                                    message: 'Fast 8 needs strong economy. Focus on econ before aggressive leveling.'
+                                });
+                            }
+                            break;
+                    }
+                    
+                    return suggestions;
                 }
 
                 updateStats(stats) {
@@ -295,6 +428,11 @@
                     } else if (stats.stage !== null) {
                         this.elements.stageValue.textContent = stats.stage;
                     }
+                    
+                    // Generate playstyle suggestions when stats update
+                    if (this.selectedPlaystyle) {
+                        this.generatePlaystyleSuggestions();
+                    }
                 }
 
                 updateEconomy(economy) {
@@ -306,68 +444,84 @@
                     this.elements.economyStatus.className = 'economy-status';
                     if (economy.economy_strength === 'weak') {
                         this.elements.economyStatus.classList.add('weak');
-                    } else if (economy.economy_strength === 'very_weak') {
-                        this.elements.economyStatus.classList.add('very-weak');
+                    } else if (economy.economy_strength === 'critical') {
+                        this.elements.economyStatus.classList.add('critical');
                     }
 
-                    // Update interest
-                    this.elements.interestValue.textContent = economy.interest || 0;
-
-                    // Update next breakpoint
-                    this.elements.nextBreakpoint.textContent = economy.next_interest_breakpoint || '--';
+                    // Update interest and streak
+                    if (economy.interest !== null) {
+                        this.elements.interestValue.textContent = `+${economy.interest}`;
+                    }
+                    
+                    if (economy.streak !== null) {
+                        this.elements.streakValue.textContent = economy.streak;
+                    }
                 }
 
                 updateSuggestions(suggestions) {
-                    const container = this.elements.suggestionsContainer;
-
                     if (!suggestions || suggestions.length === 0) {
-                        container.innerHTML = '<div class="no-data">No suggestions at this time</div>';
+                        // If no backend suggestions and no playstyle selected, show default message
+                        if (!this.selectedPlaystyle) {
+                            this.elements.suggestionsList.innerHTML = '<div class="no-suggestions">Select a playstyle above for tailored suggestions</div>';
+                        } else {
+                            this.elements.suggestionsList.innerHTML = '<div class="no-suggestions">No additional suggestions available</div>';
+                        }
+                        this.elements.suggestionCount.textContent = '0';
                         return;
                     }
 
-                    // Sort suggestions by priority (higher first)
-                    suggestions.sort((a, b) => b.priority - a.priority);
+                    this.elements.suggestionCount.textContent = suggestions.length.toString();
 
-                    container.innerHTML = '';
+                    const suggestionsHTML = suggestions.map(suggestion => {
+                        const priorityClass = `priority-${suggestion.priority || 'medium'}`;
+                        return `
+                            <div class="suggestion-item ${priorityClass}">
+                                <div class="suggestion-header">
+                                    <span class="suggestion-type">${suggestion.type || 'General'}</span>
+                                    <span class="suggestion-priority">${suggestion.priority || 'Medium'}</span>
+                                </div>
+                                <div class="suggestion-message">${suggestion.message}</div>
+                            </div>
+                        `;
+                    }).join('');
 
-                    suggestions.forEach(suggestion => {
-                        const div = document.createElement('div');
-                        div.className = `suggestion ${this.getPriorityClass(suggestion.priority)} ${suggestion.category}`;
-                        div.textContent = suggestion.message;
-                        container.appendChild(div);
-                    });
+                    this.elements.suggestionsList.innerHTML = suggestionsHTML;
                 }
 
                 formatEconomyStrength(strength) {
                     const strengthMap = {
-                        'very_strong': 'Very Strong',
+                        'excellent': 'Excellent',
                         'strong': 'Strong',
-                        'average': 'Average',
+                        'decent': 'Decent',
                         'weak': 'Weak',
-                        'very_weak': 'Very Weak'
+                        'critical': 'Critical'
                     };
-                    return strengthMap[strength] || strength;
-                }
-
-                getPriorityClass(priority) {
-                    if (priority >= 9) return 'priority-high';
-                    if (priority >= 7) return 'priority-medium';
-                    return 'priority-low';
+                    return strengthMap[strength] || 'Unknown';
                 }
 
                 getConfidenceIndicator(confidence) {
-                    if (confidence < 0.5) {
-                        return '<span class="confidence-indicator">(?)</span>';
-                    } else if (confidence < 0.8) {
-                        return '<span class="confidence-indicator">(~)</span>';
+                    if (confidence >= 0.9) return '';
+                    if (confidence >= 0.7) return '<span class="confidence-indicator medium">?</span>';
+                    return '<span class="confidence-indicator low">??</span>';
+                }
+
+                toggleMinimize() {
+                    this.isMinimized = !this.isMinimized;
+                    this.elements.container.classList.toggle('minimized', this.isMinimized);
+                    this.elements.minimizeBtn.textContent = this.isMinimized ? '+' : '−';
+                }
+
+                closeOverlay() {
+                    this.elements.container.classList.add('hidden');
+                    if (this.websocket) {
+                        this.websocket.close();
                     }
-                    return '';
                 }
             }
 
-            // Initialize overlay when page loads
+            // Initialize the overlay when the page loads
             document.addEventListener('DOMContentLoaded', () => {
-                new TFTOverlay();
+                new OverlayApp();
             });
         </script>
     </body>

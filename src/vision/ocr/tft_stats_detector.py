@@ -38,7 +38,7 @@ class GameStats:
             'timestamp': self.timestamp
         }
 
-class StatsDetector:
+class TFTStatsDetector:
     """Detects player statistics from game screen"""
     
     def __init__(self, config: Dict[str, Any]):

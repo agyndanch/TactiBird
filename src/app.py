@@ -21,7 +21,7 @@ from src.overlay.server.websocket_server import WebSocketServer
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class TFTEconomyOverlay:
+class TactiBirdOverlay:
     """Simplified TFT overlay focused on economy management"""
     
     def __init__(self, config_path: str = "config.json"):
@@ -303,7 +303,7 @@ class WebSocketServer:
 # Entry point
 async def main():
     """Main entry point"""
-    overlay = TFTEconomyOverlay()
+    overlay = TactiBirdOverlay()
     
     try:
         await overlay.start()

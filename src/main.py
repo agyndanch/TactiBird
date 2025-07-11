@@ -75,7 +75,7 @@ async def main():
     
     # Start the main overlay application
     logger.info("Starting TactiBird Overlay...")
-    overlay = TactiBirdOverlay(config)
+    overlay = TactiBirdOverlay(args.config)
     
     try:
         await overlay.start()

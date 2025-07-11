@@ -1,61 +1,118 @@
 {
   "capture": {
-    "fps": 2,
-    "monitor": 0
+    "fps": 30,
+    "method": "mss",
+    "regions": {
+      "board": {
+        "x": 480,
+        "y": 180,
+        "w": 960,
+        "h": 660
+      },
+      "shop": {
+        "x": 480,
+        "y": 900,
+        "w": 960,
+        "h": 120
+      },
+      "gold": {
+        "x": 1632,
+        "y": 1020,
+        "w": 192,
+        "h": 60
+      },
+      "health": {
+        "x": 96,
+        "y": 60,
+        "w": 153,
+        "h": 48
+      },
+      "level": {
+        "x": 480,
+        "y": 1020,
+        "w": 115,
+        "h": 48
+      },
+      "stage": {
+        "x": 864,
+        "y": 24,
+        "w": 192,
+        "h": 48
+      }
+    },
+    "window_title": "Teamfight Tactics",
+    "monitor": 0,
+    "enable_debug": false
   },
-  "detection": {
-    "confidence_threshold": 0.7,
-    "auto_detect_regions": true,
-    "ocr_engine": "tesseract",
-    "preprocessing": {
-      "enable_denoising": true,
-      "enable_sharpening": true,
-      "scale_factor": 3
+  "ai": {
+    "confidence_threshold": 0.75,
+    "max_suggestions": 5,
+    "update_interval": 0.5,
+    "economy_weight": 1.0,
+    "composition_weight": 1.0,
+    "positioning_weight": 0.8,
+    "coaches": {
+      "economy": {
+        "enabled": true,
+        "weight": 1.0
+      },
+      "composition": {
+        "enabled": false,
+        "weight": 1.0
+      },
+      "positioning": {
+        "enabled": false,
+        "weight": 0.8
+      },
+      "items": {
+        "enabled": false,
+        "weight": 0.9
+      }
     }
   },
   "overlay": {
     "port": 8765,
-    "update_interval": 1.0,
+    "host": "localhost",
+    "transparent": true,
     "always_on_top": true,
-    "transparent_background": true
-  },
-  "economy": {
-    "suggestion_cooldown": 5.0,
-    "interest_breakpoints": [10, 20, 30, 40, 50],
-    "safe_health_threshold": 40,
-    "critical_health_threshold": 20,
-    "emergency_health_threshold": 10
-  },
-  "regions": {
-    "gold": {
-      "x_percent": 0.02,
-      "y_percent": 0.88,
-      "w_percent": 0.12,
-      "h_percent": 0.06
-    },
-    "health": {
-      "x_percent": 0.02,
-      "y_percent": 0.82,
-      "w_percent": 0.12,
-      "h_percent": 0.06
-    },
-    "level": {
-      "x_percent": 0.02,
-      "y_percent": 0.76,
-      "w_percent": 0.12,
-      "h_percent": 0.06
-    },
-    "stage_round": {
-      "x_percent": 0.45,
-      "y_percent": 0.02,
-      "w_percent": 0.10,
-      "h_percent": 0.06
+    "width": 400,
+    "height": 700,
+    "position": {
+      "x": 1520,
+      "y": 50
     }
+  },
+  "vision": {
+    "template_threshold": 0.8,
+    "ocr_confidence": 0.6,
+    "preprocessing": {
+      "denoise": true,
+      "sharpen": true,
+      "contrast_enhance": true,
+      "enable_denoising": true,
+      "enable_sharpening": true,
+      "contrast_adjustment": 1.2
+    },
+    "ocr_engine": "tesseract"
   },
   "logging": {
     "level": "INFO",
-    "file": "logs/economy_overlay.log",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "max_files": 5,
+    "max_size_mb": 10,
+    "file": "logs/app.log",
     "max_size": "10MB",
-    "backup_count": 3
+    "backup_count": 5
+  },
+  "performance": {
+    "max_fps": 30,
+    "adaptive_quality": true,
+    "low_power_mode": false
+  },
+  "data": {
+    "auto_update": true,
+    "cache_size": 100,
+    "api_timeout": 30,
+    "use_local_cache": true
   }
 }

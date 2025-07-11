@@ -141,10 +141,16 @@ class TactiBirdOverlay:
                         self.last_stats = stats
                         self.stats_history.append(stats)
                         
-                        # Generate coaching suggestions
-                        suggestions = await self.economy_coach.analyze(stats)
+                        # Create game state object for coach (with .stats attribute)
+                        game_state_for_coach = type('GameState', (), {
+                            'stats': stats,
+                            'timestamp': time.time()
+                        })()
                         
-                        # Send update to UI
+                        # Generate coaching suggestions using get_suggestions method
+                        suggestions = await self.economy_coach.get_suggestions(game_state_for_coach)
+                        
+                        # Send update to UI (pass stats and suggestions separately)
                         await self._send_update(stats, suggestions)
                     
                     # Maintain frame rate - always sleep to allow cancellation
@@ -201,15 +207,16 @@ class TactiBirdOverlay:
             return None
     
     async def _send_update(self, stats: GameStats, suggestions: list):
-        """Send update to websocket clients"""
-        try:
-            if self.websocket_server:
-                game_state = {
-                    'stats': stats,
-                    'suggestions': suggestions,
-                    'timestamp': time.time()
-                }
-                await self.websocket_server.update_game_state(game_state)
-                
-        except Exception as e:
-            logger.error(f"Failed to send update: {e}")
+            """Send update to websocket clients"""
+            try:
+                if self.websocket_server:
+                    # Create game state dictionary that matches WebSocketServer expectations
+                    game_state = {
+                        'stats': stats,
+                        'suggestions': suggestions,
+                        'timestamp': time.time()
+                    }
+                    await self.websocket_server.update_game_state(game_state)
+
+            except Exception as e:
+                logger.error(f"Failed to send update: {e}")

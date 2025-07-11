@@ -160,7 +160,7 @@ class WebSocketServer:
                 # Send updated suggestions to client
                 update_data = {
                     'type': 'update',
-                    'stats': self._format_stats(self.current_game_state.get('stats')),
+                    'stats': self._format_stats(getattr(self.current_game_state, 'stats', None)),
                     'economy': self._format_economy(self.current_game_state),
                     'suggestions': suggestions
                 }
@@ -204,10 +204,10 @@ class WebSocketServer:
             # Format update data
             update_data = {
                 'type': 'update',
-                'stats': self._format_stats(game_state.get('stats')),
+                'stats': self._format_stats(getattr(game_state, 'stats', None)),
                 'economy': self._format_economy(game_state),
                 'suggestions': suggestions,
-                'timestamp': game_state.get('timestamp')
+                'timestamp': getattr(game_state, 'timestamp', None) if hasattr(game_state, 'timestamp') else getattr(game_state, 'timestamp', None)
             }
             
             # Broadcast to all connected clients
@@ -235,10 +235,10 @@ class WebSocketServer:
             
             update_data = {
                 'type': 'update',
-                'stats': self._format_stats(game_state.get('stats')),
+                'stats': self._format_stats(getattr(game_state, 'stats', None)),
                 'economy': self._format_economy(game_state),
                 'suggestions': suggestions,
-                'timestamp': game_state.get('timestamp')
+                'timestamp': getattr(game_state, 'timestamp', None) if hasattr(game_state, 'timestamp') else getattr(game_state, 'timestamp', None)
             }
             
             await self.send_to_client(websocket, update_data)
@@ -310,8 +310,13 @@ class WebSocketServer:
         """Format economy data for overlay"""
         if not game_state:
             return {}
-        
-        stats = game_state.get('stats')
+
+        # Handle both object and dictionary game_state
+        if hasattr(game_state, 'stats'):
+            stats = game_state.stats
+        else:
+            stats = getattr(game_state, 'stats', None)
+
         if not stats:
             return {}
         

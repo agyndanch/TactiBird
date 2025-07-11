@@ -207,16 +207,16 @@ class TactiBirdOverlay:
             return None
     
     async def _send_update(self, stats: GameStats, suggestions: list):
-            """Send update to websocket clients"""
-            try:
-                if self.websocket_server:
-                    # Create game state dictionary that matches WebSocketServer expectations
-                    game_state = {
-                        'stats': stats,
-                        'suggestions': suggestions,
-                        'timestamp': time.time()
-                    }
-                    await self.websocket_server.update_game_state(game_state)
-
-            except Exception as e:
-                logger.error(f"Failed to send update: {e}")
+        """Send update to websocket clients"""
+        try:
+            if self.websocket_server:
+                # Create game state object that matches both economy coach and WebSocketServer expectations
+                game_state = type('GameState', (), {
+                    'stats': stats,
+                    'suggestions': suggestions,
+                    'timestamp': time.time()
+                })()
+                await self.websocket_server.update_game_state(game_state)
+    
+        except Exception as e:
+            logger.error(f"Failed to send update: {e}")

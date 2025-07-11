@@ -31,24 +31,43 @@ def setup_logging():
         ]
     )
 
-async def shutdown_handler(overlay, loop):
-    """Handle graceful shutdown"""
+async def graceful_shutdown(overlay):
+    """Handle graceful shutdown without recursion"""
     logger = logging.getLogger(__name__)
     logger.info("Shutdown signal received, cleaning up...")
     
-    # Stop the overlay
-    if overlay:
-        await overlay.stop()
-    
-    # Cancel all remaining tasks
-    tasks = [task for task in asyncio.all_tasks(loop) if not task.done()]
-    if tasks:
-        logger.info(f"Cancelling {len(tasks)} outstanding tasks")
-        for task in tasks:
-            task.cancel()
+    try:
+        # Stop the overlay first
+        if overlay:
+            await overlay.stop()
         
-        # Wait for tasks to be cancelled
-        await asyncio.gather(*tasks, return_exceptions=True)
+        # Get current loop and all tasks
+        loop = asyncio.get_running_loop()
+        current_task = asyncio.current_task(loop)
+        
+        # Get all tasks except the current one
+        tasks = [task for task in asyncio.all_tasks(loop) 
+                if not task.done() and task is not current_task]
+        
+        if tasks:
+            logger.info(f"Cancelling {len(tasks)} outstanding tasks")
+            
+            # Cancel all tasks
+            for task in tasks:
+                if not task.cancelled():
+                    task.cancel()
+            
+            # Wait for cancellation with timeout
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=5.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Some tasks didn't complete within timeout")
+    
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
     
     logger.info("Cleanup complete")
 
@@ -98,31 +117,27 @@ async def main():
     # Start the main overlay application
     logger.info("Starting TactiBird Overlay...")
     overlay = None
+    shutdown_complete = False
     
     try:
         overlay = TactiBirdOverlay(args.config)
         
-        # Start the overlay
+        # Start the overlay - this will run until interrupted
         await overlay.start()
         
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
-        # Perform cleanup
-        if overlay:
-            await shutdown_handler(overlay, asyncio.get_running_loop())
     except asyncio.CancelledError:
         logger.info("Main task was cancelled")
-        # Perform cleanup
-        if overlay:
-            await shutdown_handler(overlay, asyncio.get_running_loop())
     except Exception as e:
         logger.error(f"Application error: {e}", exc_info=True)
         return 1
     finally:
-        # Ensure cleanup even if exceptions occur
-        if overlay:
+        # Ensure cleanup happens only once
+        if overlay and not shutdown_complete:
+            shutdown_complete = True
             try:
-                await overlay.stop()
+                await graceful_shutdown(overlay)
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}")
     
@@ -131,10 +146,13 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        # Run the application
+        # Run the application - asyncio.run handles Ctrl+C properly
         exit_code = asyncio.run(main())
         sys.exit(exit_code)
     except KeyboardInterrupt:
         # Handle Ctrl+C at the top level
         print("\nApplication interrupted by user")
         sys.exit(0)
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)

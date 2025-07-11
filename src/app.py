@@ -29,11 +29,14 @@ class TactiBirdOverlay:
         from src.config import load_config
         self.config = load_config(config_path)
         self.running = False
+        self._shutdown_started = False
         
         # Initialize components with config
-        self.stats_detector = TFTStatsDetector(self.config)  # Pass config here
-        self.economy_coach = EconomyCoach(self.config)       # Pass config here too
+        self.stats_detector = TFTStatsDetector(self.config)
+        self.economy_coach = EconomyCoach(self.config)
         self.websocket_server = None
+        self.server_task = None
+        self.main_loop_task = None
         
         # Screen capture
         self.sct = mss.mss()
@@ -52,43 +55,82 @@ class TactiBirdOverlay:
         logger.info("Starting TactiBird Overlay...")
         self.running = True
         
-        # Start websocket server - FIXED: Pass the full config instead of just the port
-        if self.websocket_server is None:
-            # Pass the entire config to WebSocketServer constructor
-            self.websocket_server = WebSocketServer(self.config)
-            # Store the server instance for proper cleanup
-            self.server_task = await self.websocket_server.start_server()
-        
-        # Start main loop
-        await self._main_loop()
+        try:
+            # Start websocket server
+            if self.websocket_server is None:
+                self.websocket_server = WebSocketServer(self.config)
+                self.server_task = await self.websocket_server.start_server()
+            
+            # Start main loop
+            self.main_loop_task = asyncio.create_task(self._main_loop())
+            
+            # Wait for main loop to complete
+            await self.main_loop_task
+            
+        except asyncio.CancelledError:
+            logger.info("Application start was cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"Error starting application: {e}")
+            raise
+        finally:
+            # Ensure we mark as not running
+            self.running = False
     
     async def stop(self):
         """Stop the overlay application"""
+        if self._shutdown_started:
+            logger.debug("Shutdown already in progress")
+            return
+        
+        self._shutdown_started = True
         logger.info("Stopping TactiBird Overlay...")
         self.running = False
         
-        if self.websocket_server:
-            await self.websocket_server.stop_server()  # Use stop_server method
-            if hasattr(self, 'server_task') and self.server_task:
+        try:
+            # Cancel main loop first
+            if self.main_loop_task and not self.main_loop_task.done():
+                self.main_loop_task.cancel()
+                try:
+                    await asyncio.wait_for(self.main_loop_task, timeout=2.0)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    logger.debug("Main loop cancelled")
+            
+            # Stop websocket server
+            if self.websocket_server:
+                await self.websocket_server.stop_server()
+            
+            # Close server task
+            if self.server_task:
                 self.server_task.close()
                 try:
                     await self.server_task.wait_closed()
                 except Exception as e:
-                    logger.error(f"Error closing server: {e}")
+                    logger.debug(f"Server task close error: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error during stop: {e}")
     
     async def _main_loop(self):
         """Main application loop"""
         fps = self.config.get('capture', {}).get('fps', 2)
         frame_time = 1.0 / fps
         
+        logger.info(f"Starting main loop with {fps} FPS")
+        
         try:
             while self.running:
                 try:
                     loop_start = time.time()
                     
+                    # Check if we should continue running
+                    if not self.running:
+                        break
+                    
                     # Capture screen
                     screenshot = await self._capture_screen()
                     if screenshot is None:
+                        # Always await sleep to allow for cancellation
                         await asyncio.sleep(frame_time)
                         continue
                     
@@ -105,18 +147,32 @@ class TactiBirdOverlay:
                         # Send update to UI
                         await self._send_update(stats, suggestions)
                     
-                    # Maintain frame rate
+                    # Maintain frame rate - always sleep to allow cancellation
                     elapsed = time.time() - loop_start
-                    sleep_time = max(0, frame_time - elapsed)
+                    sleep_time = max(0.01, frame_time - elapsed)  # Minimum 10ms sleep
                     await asyncio.sleep(sleep_time)
                     
+                except asyncio.CancelledError:
+                    logger.info("Main loop cancelled")
+                    break
+                except KeyboardInterrupt:
+                    logger.info("Keyboard interrupt in main loop")
+                    break
                 except Exception as e:
                     logger.error(f"Error in main loop: {e}")
-                    await asyncio.sleep(frame_time)
+                    # Always sleep to allow cancellation even on errors
+                    await asyncio.sleep(0.1)
                     
+        except asyncio.CancelledError:
+            logger.info("Main loop task cancelled")
+            raise  # Re-raise to propagate cancellation
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt caught in main loop")
         except Exception as e:
             logger.error(f"Critical error in main loop: {e}")
-            raise
+        finally:
+            logger.info("Main loop stopped")
+            self.running = False
     
     async def _capture_screen(self) -> Optional[np.ndarray]:
         """Capture screenshot"""
@@ -148,49 +204,12 @@ class TactiBirdOverlay:
         """Send update to websocket clients"""
         try:
             if self.websocket_server:
-                # Create game state object
                 game_state = {
                     'stats': stats,
                     'suggestions': suggestions,
                     'timestamp': time.time()
                 }
-                
-                # Update game state and broadcast to clients
                 await self.websocket_server.update_game_state(game_state)
                 
         except Exception as e:
             logger.error(f"Failed to send update: {e}")
-    
-    def get_stats_history(self, limit: int = 10) -> list:
-        """Get recent stats history"""
-        return self.stats_history[-limit:] if self.stats_history else []
-    
-    def clear_stats_history(self):
-        """Clear stats history"""
-        self.stats_history.clear()
-        logger.info("Stats history cleared")
-    
-    async def calibrate_regions(self):
-        """Auto-calibrate detection regions"""
-        try:
-            logger.info("Starting region calibration...")
-            
-            # Take screenshot for calibration
-            screenshot = await self._capture_screen()
-            if screenshot is None:
-                logger.error("Failed to capture screenshot for calibration")
-                return False
-            
-            # Use stats detector to find regions
-            regions = await self.stats_detector.auto_detect_regions(screenshot)
-            if regions:
-                self.detection_regions = regions
-                logger.info(f"Calibrated regions: {list(regions.keys())}")
-                return True
-            else:
-                logger.warning("Failed to auto-detect regions")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error during region calibration: {e}")
-            return False

@@ -47,8 +47,8 @@ class WebSocketServer:
             logger.error(f"Failed to start WebSocket server: {e}")
             raise
     
-    async def handle_client(self, websocket, path):
-        """Handle a new client connection"""
+    async def handle_client(self, websocket):
+        """Handle a new client connection - FIXED: Removed 'path' parameter"""
         try:
             self.clients.add(websocket)
             logger.info(f"Client connected: {websocket.remote_address}")
@@ -309,59 +309,18 @@ class WebSocketServer:
     def _format_economy(self, game_state) -> Dict[str, Any]:
         """Format economy data for overlay"""
         if not game_state:
-            return {
-                'economy_strength': 'unknown',
-                'interest': None,
-                'streak': None
-            }
+            return {}
         
-        stats = game_state.get('stats') if isinstance(game_state, dict) else getattr(game_state, 'stats', None)
-        
+        stats = game_state.get('stats')
         if not stats:
-            return {
-                'economy_strength': 'unknown',
-                'interest': None,
-                'streak': None
-            }
+            return {}
         
-        # Calculate economy strength based on gold and stage
-        economy_strength = self._calculate_economy_strength(stats)
-        
-        return {
-            'economy_strength': economy_strength,
-            'interest': self._calculate_interest(self._get_gold(stats)),
-            'streak': self._get_streak(stats)
-        }
-    
-    def _get_gold(self, stats):
-        """Get gold value from stats (handles both dict and object)"""
+        # Extract gold value
+        gold = None
         if hasattr(stats, 'gold'):
-            return stats.gold
+            gold = stats.gold
         elif isinstance(stats, dict):
-            return stats.get('gold')
-        return None
-    
-    def _get_stage(self, stats):
-        """Get stage value from stats (handles both dict and object)"""
-        if hasattr(stats, 'stage'):
-            return stats.stage
-        elif isinstance(stats, dict):
-            return stats.get('stage')
-        return 1
-    
-    def _get_streak(self, stats):
-        """Get streak value from stats (handles both dict and object)"""
-        if hasattr(stats, 'streak'):
-            return stats.streak
-        elif isinstance(stats, dict):
-            return stats.get('streak')
-        return None
-    
-    def _calculate_economy_strength(self, stats) -> str:
-        """Calculate economy strength classification"""
-        gold = self._get_gold(stats)
-        if gold is None:
-            return 'unknown'
+            gold = stats.get('gold')
         
         stage = self._get_stage(stats)
         
@@ -377,16 +336,35 @@ class WebSocketServer:
         # Use stage 5 thresholds for stages 6+
         stage_thresholds = thresholds.get(min(stage, 5), thresholds[5])
         
-        if gold >= stage_thresholds['excellent']:
-            return 'excellent'
-        elif gold >= stage_thresholds['strong']:
-            return 'strong'
-        elif gold >= stage_thresholds['decent']:
-            return 'decent'
-        elif gold >= stage_thresholds['weak']:
-            return 'weak'
+        if gold is not None:
+            if gold >= stage_thresholds['excellent']:
+                economy_status = 'excellent'
+            elif gold >= stage_thresholds['strong']:
+                economy_status = 'strong'
+            elif gold >= stage_thresholds['decent']:
+                economy_status = 'decent'
+            elif gold >= stage_thresholds['weak']:
+                economy_status = 'weak'
+            else:
+                economy_status = 'critical'
         else:
-            return 'critical'
+            economy_status = 'unknown'
+        
+        return {
+            'gold': gold,
+            'stage': stage,
+            'status': economy_status,
+            'interest': self._calculate_interest(gold),
+            'thresholds': stage_thresholds
+        }
+    
+    def _get_stage(self, stats) -> int:
+        """Extract stage from stats"""
+        if hasattr(stats, 'stage'):
+            return getattr(stats, 'stage', 1)
+        elif isinstance(stats, dict):
+            return stats.get('stage', 1)
+        return 1
     
     def _calculate_interest(self, gold: Optional[int]) -> Optional[int]:
         """Calculate interest income"""

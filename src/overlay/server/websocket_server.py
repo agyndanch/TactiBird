@@ -28,18 +28,21 @@ class WebSocketServer:
         # Current game state
         self.current_game_state = None
         
+        # Server instance
+        self.server = None
+        
         logger.info(f"WebSocket server initialized on {self.host}:{self.port}")
     
     async def start_server(self):
         """Start the WebSocket server"""
         try:
-            server = await websockets.serve(
+            self.server = await websockets.serve(
                 self.handle_client,
                 self.host,
                 self.port
             )
             logger.info(f"WebSocket server started on ws://{self.host}:{self.port}")
-            return server
+            return self.server
         except Exception as e:
             logger.error(f"Failed to start WebSocket server: {e}")
             raise
@@ -49,6 +52,15 @@ class WebSocketServer:
         try:
             self.clients.add(websocket)
             logger.info(f"Client connected: {websocket.remote_address}")
+            
+            # Send connection confirmation
+            await self.send_to_client(websocket, {
+                'type': 'connection',
+                'status': 'connected',
+                'server_info': {
+                    'capabilities': ['suggestions', 'game_state', 'playstyle_change']
+                }
+            })
             
             # Send initial game state if available
             if self.current_game_state:
@@ -61,8 +73,16 @@ class WebSocketServer:
                     await self.handle_message(websocket, data)
                 except json.JSONDecodeError as e:
                     logger.error(f"Invalid JSON received: {e}")
+                    await self.send_to_client(websocket, {
+                        'type': 'error',
+                        'message': 'Invalid JSON format'
+                    })
                 except Exception as e:
                     logger.error(f"Error handling message: {e}")
+                    await self.send_to_client(websocket, {
+                        'type': 'error',
+                        'message': 'Message processing error'
+                    })
                     
         except websockets.exceptions.ConnectionClosed:
             logger.info("Client disconnected")
@@ -75,16 +95,53 @@ class WebSocketServer:
         """Handle incoming messages from clients"""
         try:
             message_type = data.get('type')
+            logger.debug(f"Received message type: {message_type}")
             
             if message_type == 'playstyle_change':
                 await self.handle_playstyle_change(websocket, data)
             elif message_type == 'request_suggestions':
                 await self.handle_suggestion_request(websocket, data)
+            elif message_type == 'ping':
+                await self.handle_ping(websocket, data)
+            elif message_type == 'settings_update':
+                await self.handle_settings_update(websocket, data)
             else:
                 logger.warning(f"Unknown message type: {message_type}")
+                await self.send_to_client(websocket, {
+                    'type': 'error',
+                    'message': f'Unknown message type: {message_type}'
+                })
                 
         except Exception as e:
             logger.error(f"Error handling message type {data.get('type')}: {e}")
+    
+    async def handle_ping(self, websocket, data: Dict[str, Any]):
+        """Handle ping messages"""
+        try:
+            response = {
+                'type': 'pong',
+                'timestamp': data.get('timestamp')
+            }
+            await self.send_to_client(websocket, response)
+        except Exception as e:
+            logger.error(f"Error handling ping: {e}")
+    
+    async def handle_settings_update(self, websocket, data: Dict[str, Any]):
+        """Handle settings update messages"""
+        try:
+            settings = data.get('settings', {})
+            logger.info(f"Settings updated: {settings}")
+            
+            # You can update configuration here if needed
+            # self.config.update(settings)
+            
+            response = {
+                'type': 'settings_response',
+                'status': 'updated'
+            }
+            await self.send_to_client(websocket, response)
+        except Exception as e:
+            logger.error(f"Error handling settings update: {e}")
     
     async def handle_playstyle_change(self, websocket, data: Dict[str, Any]):
         """Handle playstyle change from overlay"""
@@ -93,7 +150,8 @@ class WebSocketServer:
             logger.info(f"Playstyle changed to: {playstyle}")
             
             # Update economy coach with new playstyle
-            self.economy_coach.set_playstyle(playstyle)
+            if hasattr(self.economy_coach, 'set_playstyle'):
+                self.economy_coach.set_playstyle(playstyle)
             
             # Generate new suggestions if we have current game state
             if self.current_game_state:
@@ -102,7 +160,7 @@ class WebSocketServer:
                 # Send updated suggestions to client
                 update_data = {
                     'type': 'update',
-                    'stats': self._format_stats(self.current_game_state.stats),
+                    'stats': self._format_stats(self.current_game_state.get('stats')),
                     'economy': self._format_economy(self.current_game_state),
                     'suggestions': suggestions
                 }
@@ -122,13 +180,13 @@ class WebSocketServer:
                     'type': 'suggestions_response',
                     'suggestions': suggestions
                 }
-                
                 await self.send_to_client(websocket, response)
             else:
                 # No game state available
                 response = {
                     'type': 'suggestions_response',
-                    'suggestions': []
+                    'suggestions': [],
+                    'message': 'No game state available'
                 }
                 await self.send_to_client(websocket, response)
                 
@@ -146,9 +204,10 @@ class WebSocketServer:
             # Format update data
             update_data = {
                 'type': 'update',
-                'stats': self._format_stats(game_state.stats),
+                'stats': self._format_stats(game_state.get('stats')),
                 'economy': self._format_economy(game_state),
-                'suggestions': suggestions
+                'suggestions': suggestions,
+                'timestamp': game_state.get('timestamp')
             }
             
             # Broadcast to all connected clients
@@ -164,8 +223,10 @@ class WebSocketServer:
                 await websocket.send(json.dumps(data))
         except websockets.exceptions.ConnectionClosed:
             self.clients.discard(websocket)
+            logger.debug("Client connection closed during send")
         except Exception as e:
             logger.error(f"Error sending to client: {e}")
+            self.clients.discard(websocket)
     
     async def send_update_to_client(self, websocket, game_state):
         """Send current game state to a specific client"""
@@ -174,9 +235,10 @@ class WebSocketServer:
             
             update_data = {
                 'type': 'update',
-                'stats': self._format_stats(game_state.stats),
+                'stats': self._format_stats(game_state.get('stats')),
                 'economy': self._format_economy(game_state),
-                'suggestions': suggestions
+                'suggestions': suggestions,
+                'timestamp': game_state.get('timestamp')
             }
             
             await self.send_to_client(websocket, update_data)
@@ -216,21 +278,46 @@ class WebSocketServer:
                 'confidence': {}
             }
         
-        return {
-            'gold': stats.gold,
-            'health': stats.health,
-            'level': stats.level,
-            'stage': stats.stage,
-            'round': stats.round_num,
-            'confidence': {
-                'gold': getattr(stats, 'gold_confidence', 0.0),
-                'health': getattr(stats, 'health_confidence', 0.0)
+        # Handle both dict and object stats
+        if hasattr(stats, '__dict__'):
+            # Object with attributes
+            return {
+                'gold': getattr(stats, 'gold', None),
+                'health': getattr(stats, 'health', None),
+                'level': getattr(stats, 'level', None),
+                'stage': getattr(stats, 'stage', None),
+                'round': getattr(stats, 'round_num', None),
+                'confidence': {
+                    'gold': getattr(stats, 'gold_confidence', 0.0),
+                    'health': getattr(stats, 'health_confidence', 0.0)
+                }
             }
-        }
+        else:
+            # Dictionary
+            return {
+                'gold': stats.get('gold'),
+                'health': stats.get('health'),
+                'level': stats.get('level'),
+                'stage': stats.get('stage'),
+                'round': stats.get('round_num'),
+                'confidence': {
+                    'gold': stats.get('gold_confidence', 0.0),
+                    'health': stats.get('health_confidence', 0.0)
+                }
+            }
     
     def _format_economy(self, game_state) -> Dict[str, Any]:
         """Format economy data for overlay"""
-        if not game_state or not game_state.stats:
+        if not game_state:
+            return {
+                'economy_strength': 'unknown',
+                'interest': None,
+                'streak': None
+            }
+        
+        stats = game_state.get('stats') if isinstance(game_state, dict) else getattr(game_state, 'stats', None)
+        
+        if not stats:
             return {
                 'economy_strength': 'unknown',
                 'interest': None,
@@ -238,21 +325,45 @@ class WebSocketServer:
             }
         
         # Calculate economy strength based on gold and stage
-        economy_strength = self._calculate_economy_strength(game_state.stats)
+        economy_strength = self._calculate_economy_strength(stats)
         
         return {
             'economy_strength': economy_strength,
-            'interest': self._calculate_interest(game_state.stats.gold),
-            'streak': getattr(game_state.stats, 'streak', None)
+            'interest': self._calculate_interest(self._get_gold(stats)),
+            'streak': self._get_streak(stats)
         }
+    
+    def _get_gold(self, stats):
+        """Get gold value from stats (handles both dict and object)"""
+        if hasattr(stats, 'gold'):
+            return stats.gold
+        elif isinstance(stats, dict):
+            return stats.get('gold')
+        return None
+    
+    def _get_stage(self, stats):
+        """Get stage value from stats (handles both dict and object)"""
+        if hasattr(stats, 'stage'):
+            return stats.stage
+        elif isinstance(stats, dict):
+            return stats.get('stage')
+        return 1
+    
+    def _get_streak(self, stats):
+        """Get streak value from stats (handles both dict and object)"""
+        if hasattr(stats, 'streak'):
+            return stats.streak
+        elif isinstance(stats, dict):
+            return stats.get('streak')
+        return None
     
     def _calculate_economy_strength(self, stats) -> str:
         """Calculate economy strength classification"""
-        if not stats or stats.gold is None:
+        gold = self._get_gold(stats)
+        if gold is None:
             return 'unknown'
         
-        gold = stats.gold
-        stage = stats.stage or 1
+        stage = self._get_stage(stats)
         
         # Define thresholds based on game stage
         thresholds = {
@@ -290,72 +401,26 @@ class WebSocketServer:
         try:
             # Close all client connections
             if self.clients:
+                logger.info(f"Closing {len(self.clients)} client connections...")
                 await asyncio.gather(
                     *[client.close() for client in self.clients],
                     return_exceptions=True
                 )
+                self.clients.clear()
             
-            logger.info("WebSocket server stopped")
+            # Close the server
+            if self.server:
+                self.server.close()
+                await self.server.wait_closed()
+                logger.info("WebSocket server stopped")
             
         except Exception as e:
             logger.error(f"Error stopping WebSocket server: {e}")
-
-
-# Integration with main application
-"""
-Example of how to integrate this into your main application:
-
-File: src/main.py or wherever your main application loop is
-"""
-
-class TactiBirdApplication:
-    """Main application class with integrated overlay server"""
     
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.overlay_server = OverlayWebSocketServer(config)
-        # ... other components
+    def get_connection_count(self) -> int:
+        """Get the number of connected clients"""
+        return len(self.clients)
     
-    async def start(self):
-        """Start the application"""
-        try:
-            # Start WebSocket server
-            server = await self.overlay_server.start_server()
-            
-            # Start other components (OCR, game detection, etc.)
-            await self.start_game_components()
-            
-            # Keep running
-            await server.wait_closed()
-            
-        except Exception as e:
-            logger.error(f"Error starting application: {e}")
-            raise
-    
-    async def start_game_components(self):
-        """Start game detection and processing components"""
-        # This is where you'd start your existing game state detection
-        # and processing logic
-        pass
-    
-    async def on_game_state_update(self, game_state):
-        """Called when game state is updated"""
-        try:
-            # Update overlay with new game state
-            await self.overlay_server.update_game_state(game_state)
-            
-        except Exception as e:
-            logger.error(f"Error updating game state: {e}")
-
-
-# Example usage in your existing game loop
-"""
-When you detect game state changes in your existing code, call:
-
-await app.overlay_server.update_game_state(new_game_state)
-
-This will automatically:
-1. Generate suggestions using the economy coach
-2. Broadcast updates to all connected overlay clients
-3. Include playstyle-specific suggestions if a playstyle is selected
-"""
+    def is_running(self) -> bool:
+        """Check if the server is running"""
+        return self.server is not None and not self.server.is_serving()

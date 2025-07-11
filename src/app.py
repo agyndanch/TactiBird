@@ -52,11 +52,12 @@ class TactiBirdOverlay:
         logger.info("Starting TactiBird Overlay...")
         self.running = True
         
-        # Start websocket server
+        # Start websocket server - FIXED: Pass the full config instead of just the port
         if self.websocket_server is None:
-            port = self.config.get('overlay', {}).get('port', 8765)
-            self.websocket_server = WebSocketServer(port)
-            await self.websocket_server.start()
+            # Pass the entire config to WebSocketServer constructor
+            self.websocket_server = WebSocketServer(self.config)
+            # Store the server instance for proper cleanup
+            self.server_task = await self.websocket_server.start_server()
         
         # Start main loop
         await self._main_loop()
@@ -67,7 +68,13 @@ class TactiBirdOverlay:
         self.running = False
         
         if self.websocket_server:
-            await self.websocket_server.stop()
+            await self.websocket_server.stop_server()  # Use stop_server method
+            if hasattr(self, 'server_task') and self.server_task:
+                self.server_task.close()
+                try:
+                    await self.server_task.wait_closed()
+                except Exception as e:
+                    logger.error(f"Error closing server: {e}")
     
     async def _main_loop(self):
         """Main application loop"""
@@ -103,43 +110,87 @@ class TactiBirdOverlay:
                     sleep_time = max(0, frame_time - elapsed)
                     await asyncio.sleep(sleep_time)
                     
-                except asyncio.CancelledError:
-                    # Handle graceful shutdown
-                    logger.info("Main loop cancelled, shutting down gracefully")
-                    break
                 except Exception as e:
-                    logger.error(f"Error in main loop: {e}", exc_info=True)
+                    logger.error(f"Error in main loop: {e}")
                     await asyncio.sleep(frame_time)
-        
-        except asyncio.CancelledError:
-            logger.info("Main loop task cancelled")
-        finally:
-            logger.info("Main loop finished")
+                    
+        except Exception as e:
+            logger.error(f"Critical error in main loop: {e}")
+            raise
     
     async def _capture_screen(self) -> Optional[np.ndarray]:
-        """Capture game screen"""
+        """Capture screenshot"""
         try:
-            # Use MSS for screen capture
-            monitor = self.sct.monitors[1]  # Primary monitor
+            # Use configured monitor or default to primary
+            monitor_config = self.config.get('capture', {}).get('monitor', {})
+            if monitor_config:
+                monitor = monitor_config
+            else:
+                monitor = self.sct.monitors[1]  # Primary monitor
+            
+            # Capture screenshot
             screenshot = self.sct.grab(monitor)
             
             # Convert to numpy array
             img = np.array(screenshot)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+            
+            # Convert BGRA to BGR (remove alpha channel)
+            if img.shape[2] == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
             
             return img
             
         except Exception as e:
-            logger.error(f"Screen capture error: {e}")
+            logger.error(f"Failed to capture screen: {e}")
             return None
     
     async def _send_update(self, stats: GameStats, suggestions: list):
-        """Send update to overlay UI"""
-        if self.websocket_server:
-            update_data = {
-                'type': 'stats_update',
-                'stats': stats.to_dict(),
-                'suggestions': [s.to_dict() for s in suggestions],
-                'timestamp': time.time()
-            }
-            await self.websocket_server.broadcast(update_data)
+        """Send update to websocket clients"""
+        try:
+            if self.websocket_server:
+                # Create game state object
+                game_state = {
+                    'stats': stats,
+                    'suggestions': suggestions,
+                    'timestamp': time.time()
+                }
+                
+                # Update game state and broadcast to clients
+                await self.websocket_server.update_game_state(game_state)
+                
+        except Exception as e:
+            logger.error(f"Failed to send update: {e}")
+    
+    def get_stats_history(self, limit: int = 10) -> list:
+        """Get recent stats history"""
+        return self.stats_history[-limit:] if self.stats_history else []
+    
+    def clear_stats_history(self):
+        """Clear stats history"""
+        self.stats_history.clear()
+        logger.info("Stats history cleared")
+    
+    async def calibrate_regions(self):
+        """Auto-calibrate detection regions"""
+        try:
+            logger.info("Starting region calibration...")
+            
+            # Take screenshot for calibration
+            screenshot = await self._capture_screen()
+            if screenshot is None:
+                logger.error("Failed to capture screenshot for calibration")
+                return False
+            
+            # Use stats detector to find regions
+            regions = await self.stats_detector.auto_detect_regions(screenshot)
+            if regions:
+                self.detection_regions = regions
+                logger.info(f"Calibrated regions: {list(regions.keys())}")
+                return True
+            else:
+                logger.warning("Failed to auto-detect regions")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error during region calibration: {e}")
+            return False

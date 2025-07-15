@@ -113,7 +113,7 @@ class TactibirdElectronApp {
     }
     
     createTray() {
-        const iconPath = path.join(__dirname, '../../assets/icons/tray_icon.png');
+        const iconPath = path.join(__dirname, '../../../assets/icons/tray_icon.png');
         this.tray = new Tray(iconPath);
         
         const contextMenu = Menu.buildFromTemplate([

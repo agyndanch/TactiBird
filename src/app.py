@@ -137,6 +137,8 @@ class TactiBirdOverlay:
                     # Detect stats
                     stats = await self.stats_detector.detect_stats(screenshot)
                     if stats and stats.in_game:
+                        logger.info(f"Stats detected: Gold={stats.gold}, Health={stats.health}, Level={stats.level}")
+                        
                         # Update game state
                         self.last_stats = stats
                         self.stats_history.append(stats)

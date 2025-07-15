@@ -84,7 +84,7 @@
   },
   "vision": {
     "template_threshold": 0.8,
-    "ocr_confidence": 0.6,
+    "ocr_confidence": 0.3,
     "preprocessing": {
       "denoise": true,
       "sharpen": true,

@@ -138,9 +138,23 @@
             }
 
             setupEventListeners() {
-                this.elements.minimizeBtn.addEventListener('click', () => this.toggleMinimize());
-                this.elements.closeBtn.addEventListener('click', () => this.closeOverlay());
-                this.elements.playstyleSelect.addEventListener('change', (e) => this.onPlaystyleChange(e.target.value));
+                this.elements.minimizeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleMinimize();
+                });
+                this.elements.closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.closeOverlay();
+                });
+                this.elements.playstyleSelect.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    this.onPlaystyleChange(e.target.value);
+                });
+                
+                // Prevent overlay container clicks from propagating
+                this.elements.container.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
             }
 
             connect() {

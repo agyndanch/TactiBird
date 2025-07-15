@@ -97,6 +97,10 @@ class WebSocketClient {
             case 'connection':
                 this.handleConnectionMessage(data);
                 break;
+
+            case 'update':  // ADD THIS CASE
+                this.options.onMessage(data);
+                break;
                 
             case 'suggestions':
                 this.options.onMessage(data);

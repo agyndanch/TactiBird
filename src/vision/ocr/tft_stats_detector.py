@@ -374,27 +374,28 @@ class TFTStatsDetector:
         try:
             # If we have previous stats, use them to validate current ones
             if self.last_stats and self.last_stats.in_game:
-                # Gold shouldn't change drastically in one frame
-                if abs(stats.gold - self.last_stats.gold) > 50:
+                # Gold shouldn't change drastically in one frame - INCREASE THRESHOLD
+                if abs(stats.gold - self.last_stats.gold) > 100:  # Changed from 50 to 100
                     # If change is too large, use smoothed value
-                    stats.gold = self._smooth_value(stats.gold, self.last_stats.gold, 0.7)
-                
+                    stats.gold = self._smooth_value(stats.gold, self.last_stats.gold, 0.5)  # Changed from 0.7 to 0.5
+
                 # Health should only decrease or stay same (except healing items)
-                if stats.health > self.last_stats.health + 5:  # Allow small healing
+                if stats.health > self.last_stats.health + 10:  # Changed from 5 to 10
                     stats.health = self.last_stats.health
-                
+
                 # Level should only increase or stay same
                 if stats.level < self.last_stats.level:
                     stats.level = self.last_stats.level
-                
-                # Stage/round should progress logically
-                if (stats.stage < self.last_stats.stage or 
-                    (stats.stage == self.last_stats.stage and stats.round_num < self.last_stats.round_num)):
-                    stats.stage = self.last_stats.stage
-                    stats.round_num = self.last_stats.round_num
-            
+
+                # REMOVE OVERLY STRICT STAGE/ROUND VALIDATION
+                # Comment out or remove these lines:
+                # if (stats.stage < self.last_stats.stage or 
+                #     (stats.stage == self.last_stats.stage and stats.round_num < self.last_stats.round_num)):
+                #     stats.stage = self.last_stats.stage
+                #     stats.round_num = self.last_stats.round_num
+
             return stats
-            
+        
         except Exception as e:
             logger.debug(f"Error validating stats: {e}")
             return stats

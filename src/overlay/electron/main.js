@@ -137,7 +137,7 @@ class TactibirdElectronApp {
             }
         ]);
         
-        this.tray.setToolTip('TactiBird - TFT AI Coach');
+        this.tray.setToolTip('TactiBird');
         this.tray.setContextMenu(contextMenu);
         
         // Handle tray click
